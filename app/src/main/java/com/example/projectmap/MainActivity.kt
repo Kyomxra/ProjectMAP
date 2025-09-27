@@ -5,16 +5,52 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import android.app.Dialog
+import android.widget.Button
+import android.widget.EditText
+import android.widget.Toast
+import android.widget.LinearLayout
+
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+
+        val btnGetStarted = findViewById<Button>(R.id.btnGetStarted)
+
+        btnGetStarted.setOnClickListener {
+            showLoginPopup()
         }
+    }
+
+    private fun showLoginPopup() {
+        val dialog = Dialog(this)
+        dialog.setContentView(R.layout.popup_login)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val emailInput = dialog.findViewById<EditText>(R.id.etEmail)
+        val passwordInput = dialog.findViewById<EditText>(R.id.etPassword)
+        val btnMasuk = dialog.findViewById<Button>(R.id.btnMasuk)
+
+        btnMasuk.setOnClickListener {
+            val email = emailInput.text.toString()
+            val password = passwordInput.text.toString()
+
+            if (email.isNotEmpty() && password.isNotEmpty()) {
+                Toast.makeText(this, "Login berhasil!", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            } else {
+                Toast.makeText(this, "Isi semua data", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialog.show()
+
+        // 👉 atur ukuran biar nggak kecil kayak di screenshot
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9).toInt(),
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
     }
 }

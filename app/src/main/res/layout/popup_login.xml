@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:gravity="center"
+    android:background="@drawable/bg_popup">
+
+    <!-- Judul (opsional) -->
+
+    <TextView
+        android:id="@+id/tvLoginTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Login"
+        android:textStyle="bold"
+        android:textSize="20sp"
+        android:textColor="@android:color/black"
+        android:layout_gravity="center"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Input Email -->
+
+    <EditText
+        android:id="@+id/etEmail"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:hint="Email atau No. telp"
+        android:background="@drawable/bg_input"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Input Password -->
+
+    <EditText
+        android:id="@+id/etPassword"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:hint="Kata Sandi"
+        android:inputType="textPassword"
+        android:background="@drawable/bg_input"
+        android:padding="12dp"
+        android:layout_marginBottom="20dp"/>
+
+    <!-- Tombol Masuk -->
+
+    <Button
+        android:id="@+id/btnMasuk"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="Masuk"
+        android:textAllCaps="false"
+        android:textColor="@android:color/white"
+        android:background="@drawable/bg_button_gradient"
+        android:layout_marginTop="10dp"/>
+
+</LinearLayout>
