@@ -11,6 +11,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ProjectMAP">
+
+        <!-- Login ada di MAINACTIVITY -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -20,6 +22,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Ini dashboard  -->
+        <activity android:name=".DashboardActivity" />
     </application>
 
 </manifest>

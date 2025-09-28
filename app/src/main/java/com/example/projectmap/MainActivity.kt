@@ -10,6 +10,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import android.widget.LinearLayout
+import android.content.Intent
+
 
 
 class MainActivity : AppCompatActivity() {
@@ -40,9 +42,15 @@ class MainActivity : AppCompatActivity() {
             if (email.isNotEmpty() && password.isNotEmpty()) {
                 Toast.makeText(this, "Login berhasil!", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
+
+                // Pindah ke DashboardActivity
+                val intent = Intent(this, DashboardActivity::class.java)
+                startActivity(intent)
+                finish() // biar ga balik ke login popup kalau tekan back
             } else {
                 Toast.makeText(this, "Isi semua data", Toast.LENGTH_SHORT).show()
             }
+
         }
 
         // show dulu biar window sudah attach
