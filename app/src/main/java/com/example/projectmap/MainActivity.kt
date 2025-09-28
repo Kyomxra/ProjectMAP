@@ -45,12 +45,22 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // show dulu biar window sudah attach
         dialog.show()
 
-        // 👉 atur ukuran biar nggak kecil kayak di screenshot
+        // Atur ukuran popup
         dialog.window?.setLayout(
             (resources.displayMetrics.widthPixels * 0.9).toInt(),
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
+
+        // Tambahin efek dim
+        dialog.window?.let { window ->
+            val lp = window.attributes
+            lp.dimAmount = 0.5f // 0.0 = no dim, 1.0 = full black
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.attributes = lp
+        }
     }
+
 }

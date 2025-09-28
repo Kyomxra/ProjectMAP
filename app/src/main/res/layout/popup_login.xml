@@ -22,22 +22,48 @@
 
     <!-- Input Email -->
 
+    <TextView
+        android:id="@+id/login_subtext"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Email atau No.telp"
+        android:textSize="18sp"
+        android:textColor="@color/grey"
+        android:layout_marginBottom="16dp"
+        android:layout_marginTop="15dp"
+        android:layout_gravity="center" />
+
+
+    <!-- Email contoh -->
+
     <EditText
         android:id="@+id/etEmail"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:hint="Email atau No. telp"
+        android:hint="+62XXX atau you@gmail.com"
         android:background="@drawable/bg_input"
         android:padding="12dp"
-        android:layout_marginBottom="12dp"/>
+        android:layout_marginBottom="12dp" />
 
     <!-- Input Password -->
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Kata Sandi"
+        android:textSize="18sp"
+        android:textColor="@color/grey"
+        android:layout_marginBottom="16dp"
+        android:layout_marginTop="15dp"
+        android:layout_gravity="center" />
+
+    <!-- Password contoh -->
 
     <EditText
         android:id="@+id/etPassword"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:hint="Kata Sandi"
+        android:hint="Masukkan kata sandi anda"
         android:inputType="textPassword"
         android:background="@drawable/bg_input"
         android:padding="12dp"
