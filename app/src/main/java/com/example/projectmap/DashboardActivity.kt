@@ -1,15 +1,17 @@
 package com.example.projectmap
 
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import androidx.drawerlayout.widget.DrawerLayout
 
@@ -45,7 +47,7 @@ class DashboardActivity : AppCompatActivity() {
             true
         }
 
-        // === Existing Dashboard Logic ===
+        // === Dashboard Data ===
         val tvIncome = findViewById<TextView>(R.id.tvIncome)
         val tvExpense = findViewById<TextView>(R.id.tvExpense)
         val tvBalance = findViewById<TextView>(R.id.tvBalance)
@@ -73,5 +75,34 @@ class DashboardActivity : AppCompatActivity() {
             Transaction("Top Up Valorant", "- Rp 350,000", "Aug 11, 2025")
         )
         rvTransactions.adapter = TransactionAdapter(dummyTransactions)
+
+        // === Floating Action Button ===
+        val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
+        fabAdd.setOnClickListener {
+            showAddBottomSheet()
+        }
+    }
+
+    private fun showAddBottomSheet() {
+        val bottomSheetDialog = BottomSheetDialog(this)
+        val view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_add, null)
+        bottomSheetDialog.setContentView(view)
+
+        val btnPemasukan = view.findViewById<TextView>(R.id.btnPemasukan)
+        val btnPengeluaran = view.findViewById<TextView>(R.id.btnPengeluaran)
+
+        btnPemasukan.setOnClickListener {
+            bottomSheetDialog.dismiss()
+            Toast.makeText(this, "Tambah Pemasukan", Toast.LENGTH_SHORT).show()
+            // TODO: startActivity(Intent(this, FormPemasukanActivity::class.java))
+        }
+
+        btnPengeluaran.setOnClickListener {
+            bottomSheetDialog.dismiss()
+            Toast.makeText(this, "Tambah Pengeluaran", Toast.LENGTH_SHORT).show()
+            // TODO: startActivity(Intent(this, FormPengeluaranActivity::class.java))
+        }
+
+        bottomSheetDialog.show()
     }
 }
