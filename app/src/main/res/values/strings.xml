@@ -2,4 +2,6 @@
     <string name="app_name">FinanceZ</string>
     <string name="btn_get_started">Get Started</string>
     <string name="app_slogan">Spend Smarter\nSave More</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

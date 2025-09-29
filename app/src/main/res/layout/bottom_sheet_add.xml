@@ -3,27 +3,28 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="24dp">
 
+    <!-- Tombol Pemasukan -->
     <TextView
         android:id="@+id/btnPemasukan"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Pemasukan"
+        android:text="➕ Tambah Pemasukan"
         android:textSize="16sp"
+        android:gravity="center"
         android:padding="12dp"
-        android:drawableEnd="@drawable/right"
-        android:gravity="center_vertical"
-        android:background="?attr/selectableItemBackground"/>
+        android:background="?android:attr/selectableItemBackground" />
 
+    <!-- Tombol Pengeluaran -->
     <TextView
         android:id="@+id/btnPengeluaran"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Pengeluaran"
+        android:text="➖ Tambah Pengeluaran"
         android:textSize="16sp"
+        android:gravity="center"
         android:padding="12dp"
-        android:drawableEnd="@drawable/right"
-        android:gravity="center_vertical"
-        android:background="?attr/selectableItemBackground"/>
+        android:background="?android:attr/selectableItemBackground"
+        android:layout_marginTop="12dp"/>
 </LinearLayout>

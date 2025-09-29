@@ -36,38 +36,28 @@ class DashboardActivity : AppCompatActivity() {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
-        // handle klik menu drawer
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_profile -> Toast.makeText(this, "Profile clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_home -> Toast.makeText(this, "Home clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_search -> Toast.makeText(this, "Search clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_settings -> Toast.makeText(this, "Settings clicked", Toast.LENGTH_SHORT).show()
-                R.id.nav_logout -> Toast.makeText(this, "Logout clicked", Toast.LENGTH_SHORT).show()
             }
-            drawerLayout.closeDrawer(GravityCompat.END)
+            drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
 
-        // === Dashboard Data ===
-        val tvIncome = findViewById<TextView>(R.id.tvIncome)
-        val tvExpense = findViewById<TextView>(R.id.tvExpense)
-        val tvBalance = findViewById<TextView>(R.id.tvBalance)
-        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
-        val rvTransactions = findViewById<RecyclerView>(R.id.rvTransactions)
 
+        // === Summary Fragment ===
+        val summaryFragment =
+            supportFragmentManager.findFragmentById(R.id.summaryFragment) as SummaryFragment
+
+        // Dummy data
         val income = 1_200_000
         val expense = 460_000
-        val balance = income - expense
+        summaryFragment.updateSummary("Agustus 2025", income, expense)
 
-        tvIncome.text = "Rp $income"
-        tvExpense.text = "Rp $expense"
-        tvBalance.text = "+ Rp $balance"
-
-        val total = income + expense
-        if (total > 0) {
-            val progress = (income * 100) / total
-            progressBar.progress = progress
-        }
-
+        // === RecyclerView Transaksi ===
+        val rvTransactions = findViewById<RecyclerView>(R.id.rvTransactions)
         rvTransactions.layoutManager = LinearLayoutManager(this)
         val dummyTransactions = listOf(
             Transaction("Makan Siang Mi Ayam", "- Rp 20,000", "Today"),
