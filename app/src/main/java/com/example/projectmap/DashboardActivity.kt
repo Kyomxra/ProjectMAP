@@ -10,17 +10,18 @@ import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import androidx.drawerlayout.widget.DrawerLayout
 import java.util.*
 
-
 class DashboardActivity : AppCompatActivity() {
 
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navView: NavigationView
+    private lateinit var bottomNav: BottomNavigationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,6 +30,7 @@ class DashboardActivity : AppCompatActivity() {
         // === Drawer Setup ===
         drawerLayout = findViewById(R.id.drawerLayout)
         navView = findViewById(R.id.navView)
+        bottomNav = findViewById(R.id.bottomNavigation)
         val topAppBar = findViewById<MaterialToolbar>(R.id.topAppBar)
 
         setSupportActionBar(topAppBar)
@@ -38,14 +40,29 @@ class DashboardActivity : AppCompatActivity() {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
+        // Listener Drawer
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_home -> Toast.makeText(this, "Home clicked", Toast.LENGTH_SHORT).show()
-                R.id.nav_search -> Toast.makeText(this, "Search clicked", Toast.LENGTH_SHORT).show()
-                R.id.nav_mail -> Toast.makeText(this, "Messages clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_profile -> Toast.makeText(this, "Profile clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_settings -> Toast.makeText(this, "Settings clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_logout -> Toast.makeText(this, "Logout clicked", Toast.LENGTH_SHORT).show()
             }
             drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
+
+        // Listener Bottom Nav
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    Toast.makeText(this, "Home selected", Toast.LENGTH_SHORT).show()
+                    // TODO: ganti fragment ke HomeFragment
+                }
+                R.id.nav_search -> {
+                    Toast.makeText(this, "Location selected", Toast.LENGTH_SHORT).show()
+                    // TODO: ganti fragment ke LocationFragment
+                }
+            }
             true
         }
 
@@ -53,7 +70,6 @@ class DashboardActivity : AppCompatActivity() {
         val summaryFragment =
             supportFragmentManager.findFragmentById(R.id.summaryFragment) as SummaryFragment
 
-        // Dummy data
         val income = 1_200_000
         val expense = 460_000
         summaryFragment.updateSummary("Agustus 2025", income, expense)
@@ -84,7 +100,7 @@ class DashboardActivity : AppCompatActivity() {
         val btnPengeluaran = view.findViewById<TextView>(R.id.btnPengeluaran)
 
         btnPemasukan.setOnClickListener {
-            bottomSheetDialog.dismiss() // ✅ ini yang benar
+            bottomSheetDialog.dismiss()
             showAddIncomeDialog()
         }
 
