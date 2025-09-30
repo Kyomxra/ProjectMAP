@@ -205,7 +205,7 @@
             app:fabSize="normal"
             android:contentDescription="Tambah"
             app:layout_anchor="@id/bottomNavigation"
-            android:layout_marginBottom="30dp"/>
+            android:layout_marginBottom="50dp"/>
 
         <!-- Bottom Navigation -->
         <com.google.android.material.bottomnavigation.BottomNavigationView

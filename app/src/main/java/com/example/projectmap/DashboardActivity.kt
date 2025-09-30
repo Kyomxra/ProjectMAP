@@ -40,12 +40,12 @@ class DashboardActivity : AppCompatActivity() {
             when (menuItem.itemId) {
                 R.id.nav_home -> Toast.makeText(this, "Home clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_search -> Toast.makeText(this, "Search clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_mail -> Toast.makeText(this, "Messages clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_settings -> Toast.makeText(this, "Settings clicked", Toast.LENGTH_SHORT).show()
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
-
 
         // === Summary Fragment ===
         val summaryFragment =
