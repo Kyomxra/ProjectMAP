@@ -1,10 +1,10 @@
 package com.example.projectmap
 
+import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.widget.ProgressBar
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -14,6 +14,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import androidx.drawerlayout.widget.DrawerLayout
+import java.util.*
+
 
 class DashboardActivity : AppCompatActivity() {
 
@@ -82,17 +84,63 @@ class DashboardActivity : AppCompatActivity() {
         val btnPengeluaran = view.findViewById<TextView>(R.id.btnPengeluaran)
 
         btnPemasukan.setOnClickListener {
-            bottomSheetDialog.dismiss()
-            Toast.makeText(this, "Tambah Pemasukan", Toast.LENGTH_SHORT).show()
-            // TODO: startActivity(Intent(this, FormPemasukanActivity::class.java))
+            bottomSheetDialog.dismiss() // ✅ ini yang benar
+            showAddIncomeDialog()
         }
 
         btnPengeluaran.setOnClickListener {
             bottomSheetDialog.dismiss()
             Toast.makeText(this, "Tambah Pengeluaran", Toast.LENGTH_SHORT).show()
-            // TODO: startActivity(Intent(this, FormPengeluaranActivity::class.java))
         }
 
         bottomSheetDialog.show()
+    }
+
+    private fun showAddIncomeDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_income, null)
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        val spinnerType = dialogView.findViewById<Spinner>(R.id.spinnerType)
+        val etDate = dialogView.findViewById<EditText>(R.id.etDate)
+        val etAmount = dialogView.findViewById<EditText>(R.id.etAmount)
+        val btnAdd = dialogView.findViewById<Button>(R.id.btnAddIncome)
+
+        // Isi spinner tipe
+        val types = listOf("Gaji", "Bonus", "Lainnya")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, types)
+        spinnerType.adapter = adapter
+
+        // DatePicker
+        etDate.setOnClickListener {
+            val calendar = Calendar.getInstance()
+            val datePicker = DatePickerDialog(
+                this,
+                { _, year, month, day ->
+                    etDate.setText("$day/${month + 1}/$year")
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            )
+            datePicker.show()
+        }
+
+        // Button Tambahkan
+        btnAdd.setOnClickListener {
+            val type = spinnerType.selectedItem.toString()
+            val date = etDate.text.toString()
+            val amount = etAmount.text.toString()
+
+            if (date.isNotEmpty() && amount.isNotEmpty()) {
+                Toast.makeText(this, "Pemasukan $type: Rp$amount pada $date ditambahkan", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            } else {
+                Toast.makeText(this, "Lengkapi semua field!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialog.show()
     }
 }
