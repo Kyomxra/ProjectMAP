@@ -16,16 +16,31 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import androidx.drawerlayout.widget.DrawerLayout
 import java.util.*
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Geocoder
+import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import java.util.Locale
 
 class DashboardActivity : AppCompatActivity() {
 
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var navView: NavigationView
     private lateinit var bottomNav: BottomNavigationView
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private val LOCATION_PERMISSION_REQUEST = 1001
+
+    // untuk RecyclerView
+    private lateinit var transactionAdapter: TransactionAdapter
+    private val transactionList = mutableListOf<Transaction>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_dashboard)
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         // === Drawer Setup ===
         drawerLayout = findViewById(R.id.drawerLayout)
@@ -77,12 +92,15 @@ class DashboardActivity : AppCompatActivity() {
         // === RecyclerView Transaksi ===
         val rvTransactions = findViewById<RecyclerView>(R.id.rvTransactions)
         rvTransactions.layoutManager = LinearLayoutManager(this)
-        val dummyTransactions = listOf(
-            Transaction("Makan Siang Mi Ayam", "- Rp 20,000", "Today"),
-            Transaction("Transfer ke Fawwaz", "- Rp 75,000", "Yesterday"),
-            Transaction("Top Up Valorant", "- Rp 350,000", "Aug 11, 2025")
+        transactionList.addAll(
+            listOf(
+                Transaction("Makan Siang Mi Ayam", "- Rp 20,000", "Today"),
+                Transaction("Transfer ke Fawwaz", "- Rp 75,000", "Yesterday"),
+                Transaction("Top Up Valorant", "- Rp 350,000", "Aug 11, 2025")
+            )
         )
-        rvTransactions.adapter = TransactionAdapter(dummyTransactions)
+        transactionAdapter = TransactionAdapter(transactionList)
+        rvTransactions.adapter = transactionAdapter
 
         // === Floating Action Button ===
         val fabAdd = findViewById<FloatingActionButton>(R.id.fabAdd)
@@ -91,6 +109,40 @@ class DashboardActivity : AppCompatActivity() {
         }
     }
 
+    // 🔹 ambil lokasi
+    private fun getCurrentLocation(onResult: (String) -> Unit) {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST
+            )
+            return
+        }
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val geocoder = Geocoder(this, Locale.getDefault())
+                val addresses =
+                    geocoder.getFromLocation(location.latitude, location.longitude, 1)
+
+                val placeName = if (!addresses.isNullOrEmpty()) {
+                    addresses[0].getAddressLine(0) // alamat lengkap
+                } else {
+                    "Lokasi tidak diketahui"
+                }
+                onResult(placeName)
+            } else {
+                onResult("Lokasi tidak ditemukan")
+            }
+        }
+    }
+
+    // 🔹 bottom sheet: pilih pemasukan / pengeluaran
     private fun showAddBottomSheet() {
         val bottomSheetDialog = BottomSheetDialog(this)
         val view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_add, null)
@@ -112,9 +164,11 @@ class DashboardActivity : AppCompatActivity() {
         bottomSheetDialog.show()
     }
 
+    // 🔹 dialog tambah pemasukan
     private fun showAddIncomeDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_income, null)
         val dialog = AlertDialog.Builder(this)
+            .setTitle("Tambahkan Pemasukan")
             .setView(dialogView)
             .create()
 
@@ -150,13 +204,25 @@ class DashboardActivity : AppCompatActivity() {
             val amount = etAmount.text.toString()
 
             if (date.isNotEmpty() && amount.isNotEmpty()) {
-                Toast.makeText(this, "Pemasukan $type: Rp$amount pada $date ditambahkan", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
+                // ambil lokasi saat tambah
+                getCurrentLocation { lokasi ->
+                    val transaksi = Transaction(
+                        title = type,
+                        amount = "+ Rp $amount",
+                        date = "$date – 📍$lokasi"
+                    )
+
+                    // tambahkan ke list + update adapter
+                    transactionList.add(0, transaksi)
+                    transactionAdapter.notifyItemInserted(0)
+
+                    Toast.makeText(this, "Pemasukan ditambahkan!", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
             } else {
                 Toast.makeText(this, "Lengkapi semua field!", Toast.LENGTH_SHORT).show()
             }
         }
-
         dialog.show()
     }
 }
