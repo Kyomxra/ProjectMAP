@@ -1,15 +1,29 @@
+# IntelliJ / Android Studio
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+/.idea/
+!.idea/codeStyles
+!.idea/runConfigurations
 .DS_Store
-/build
+
+# Build output
+/build/
+/app/build/
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+
+# Keystore files (jangan commit)
+*.jks
+*.keystore
+
+# Google Services (firebase, maps, dll.)
+google-services.json
+secrets.properties
+
+# Android Profiling
+*.hprof
+
+# Mac/Windows system files
+Thumbs.db
