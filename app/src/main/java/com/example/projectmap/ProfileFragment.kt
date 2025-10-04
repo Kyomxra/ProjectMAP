@@ -66,7 +66,7 @@ class ProfileFragment : Fragment() {
         val userId = user.uid
         tvUserId.text = "User ID: $userId"
 
-        firestore.collection("User").document(userId)   // ✅ now matches your Firestore doc ID
+        firestore.collection("User").document(user.uid)   // ✅ now matches your Firestore doc ID
             .get()
             .addOnSuccessListener { document ->
                 if (document != null && document.exists()) {

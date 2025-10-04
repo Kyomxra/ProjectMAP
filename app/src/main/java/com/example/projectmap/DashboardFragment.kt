@@ -26,6 +26,9 @@ import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+
 
 class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
@@ -41,6 +44,39 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        val tvWelcome = view.findViewById<TextView>(R.id.tvWelcome)
+        val tvUserName = view.findViewById<TextView>(R.id.tvUserName)
+
+        val auth = FirebaseAuth.getInstance()
+        val firestore = FirebaseFirestore.getInstance()
+
+        val user = auth.currentUser
+        if (user == null) {
+            // Belum login
+            tvWelcome.text = "Selamat siang,"
+            tvUserName.text = "Guest"
+        } else {
+            // Sudah login, ambil data dari Firestore
+            firestore.collection("User").document(user.uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        val fName = document.getString("FName") ?: ""
+                        val lName = document.getString("LName") ?: ""
+                        tvWelcome.text = "Selamat siang,"
+                        tvUserName.text = "$fName $lName"
+                    } else {
+                        tvWelcome.text = "Selamat siang,"
+                        tvUserName.text = "User"
+                    }
+                }
+                .addOnFailureListener {
+                    tvWelcome.text = "Selamat siang,"
+                    tvUserName.text = "User"
+                }
+        }
+
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
