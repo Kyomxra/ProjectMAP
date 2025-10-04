@@ -66,7 +66,7 @@ class ProfileFragment : Fragment() {
         val userId = user.uid
         tvUserId.text = "User ID: $userId"
 
-        firestore.collection("users").document(userId)
+        firestore.collection("User").document(userId)   // ✅ now matches your Firestore doc ID
             .get()
             .addOnSuccessListener { document ->
                 if (document != null && document.exists()) {
@@ -91,6 +91,8 @@ class ProfileFragment : Fragment() {
                     if (!imageUrl.isNullOrEmpty()) {
                         Glide.with(requireContext()).load(imageUrl).into(imgProfile)
                     }
+                } else {
+                    Toast.makeText(requireContext(), "Profil tidak ditemukan", Toast.LENGTH_SHORT).show()
                 }
             }
             .addOnFailureListener {

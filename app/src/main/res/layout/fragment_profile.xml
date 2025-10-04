@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:background="#FFFFFF">
 
     <LinearLayout
@@ -11,15 +12,18 @@
         android:padding="24dp">
 
         <!-- Foto Profil -->
-        <ImageView
+        <de.hdodenhof.circleimageview.CircleImageView
             android:id="@+id/imgProfile"
             android:layout_width="120dp"
             android:layout_height="120dp"
-            android:layout_gravity="center"
-            android:layout_marginBottom="16dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="120dp"
+            android:layout_marginBottom="30dp"
             android:src="@drawable/profile"
             android:background="@drawable/profile_circle_bg"
-            android:scaleType="centerCrop" />
+            android:padding="4dp"
+            app:civ_border_width="2dp"
+            app:civ_border_color="@android:color/white" />
 
         <!-- Tombol Ubah Foto -->
         <Button
