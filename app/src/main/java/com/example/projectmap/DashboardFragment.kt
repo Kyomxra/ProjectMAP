@@ -60,13 +60,19 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         // Listener Drawer
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_profile -> Toast.makeText(requireContext(), "Profile clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_profile -> {
+                    parentFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainer, ProfileFragment())
+                        .addToBackStack(null)
+                        .commit()
+                }
                 R.id.nav_settings -> Toast.makeText(requireContext(), "Settings clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_logout -> Toast.makeText(requireContext(), "Logout clicked", Toast.LENGTH_SHORT).show()
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
+
 
         // Listener Bottom Nav
         bottomNav.setOnItemSelectedListener { item ->
