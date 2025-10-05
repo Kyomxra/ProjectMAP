@@ -13,7 +13,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import java.text.SimpleDateFormat
@@ -31,9 +30,10 @@ class ProfileFragment : Fragment() {
     private val PICK_IMAGE_REQUEST = 1001
     private var imageUri: Uri? = null
 
-    private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
     private val storageRef = FirebaseStorage.getInstance().getReference("profile_pictures")
+
+    private var userId: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -47,7 +47,20 @@ class ProfileFragment : Fragment() {
         tvEmail = view.findViewById(R.id.tvEmail)
         tvDob = view.findViewById(R.id.tvDob)
 
-        loadUserProfile()
+        val toolbar = view.findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.topAppBar)
+        toolbar.setNavigationOnClickListener {
+            parentFragmentManager.popBackStack() // balik ke fragment sebelumnya
+        }
+
+        // 🔹 Ambil userId dari SharedPreferences
+        val prefs = requireContext().getSharedPreferences("MyAppPrefs", 0)
+        userId = prefs.getString("userId", null)
+
+        if (userId != null) {
+            loadUserProfile(userId!!)
+        } else {
+            Toast.makeText(requireContext(), "User belum login", Toast.LENGTH_SHORT).show()
+        }
 
         btnChangePhoto.setOnClickListener {
             pickImageFromGallery()
@@ -56,30 +69,21 @@ class ProfileFragment : Fragment() {
         return view
     }
 
-    private fun loadUserProfile() {
-        val user = auth.currentUser
-        if (user == null) {
-            Toast.makeText(requireContext(), "User belum login", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val userId = user.uid
-        tvUserId.text = "User ID: $userId"
-
-        firestore.collection("User").document(user.uid)   // ✅ now matches your Firestore doc ID
+    private fun loadUserProfile(userId: String) {
+        firestore.collection("User").document(userId)
             .get()
             .addOnSuccessListener { document ->
                 if (document != null && document.exists()) {
                     val fName = document.getString("FName") ?: ""
                     val lName = document.getString("LName") ?: ""
                     val email = document.getString("Email") ?: ""
-                    val dob = document.get("DOB") // bisa Timestamp atau String
+                    val dob = document.get("DOB")
                     val imageUrl = document.getString("imageURL")
 
+                    tvUserId.text = "User ID: $userId"
                     tvDisplayName.text = "Nama: $fName $lName"
                     tvEmail.text = "Email: $email"
 
-                    // tampilkan DOB
                     if (dob is com.google.firebase.Timestamp) {
                         val date = dob.toDate()
                         val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
@@ -91,6 +95,7 @@ class ProfileFragment : Fragment() {
                     if (!imageUrl.isNullOrEmpty()) {
                         Glide.with(requireContext()).load(imageUrl).into(imgProfile)
                     }
+
                 } else {
                     Toast.makeText(requireContext(), "Profil tidak ditemukan", Toast.LENGTH_SHORT).show()
                 }
@@ -115,14 +120,15 @@ class ProfileFragment : Fragment() {
     }
 
     private fun uploadImageToFirebase() {
-        val user = auth.currentUser ?: return
-        val fileRef = storageRef.child("${user.uid}.jpg")
+        if (userId == null) return
+
+        val fileRef = storageRef.child("${userId}.jpg")
 
         imageUri?.let { uri ->
             fileRef.putFile(uri)
                 .addOnSuccessListener {
                     fileRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                        firestore.collection("users").document(user.uid)
+                        firestore.collection("User").document(userId!!)
                             .update("imageURL", downloadUri.toString())
                             .addOnSuccessListener {
                                 Glide.with(requireContext()).load(downloadUri).into(imgProfile)

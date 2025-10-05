@@ -5,7 +5,6 @@ import android.app.DatePickerDialog
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
@@ -26,9 +25,7 @@ import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-
 
 class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
@@ -37,6 +34,9 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     private lateinit var bottomNav: BottomNavigationView
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val LOCATION_PERMISSION_REQUEST = 1001
+
+    // Firestore
+    private val firestore = FirebaseFirestore.getInstance()
 
     // untuk RecyclerView
     private lateinit var transactionAdapter: TransactionAdapter
@@ -48,17 +48,17 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         val tvWelcome = view.findViewById<TextView>(R.id.tvWelcome)
         val tvUserName = view.findViewById<TextView>(R.id.tvUserName)
 
-        val auth = FirebaseAuth.getInstance()
-        val firestore = FirebaseFirestore.getInstance()
+        // 🔹 Ambil userId dari SharedPreferences
+        val prefs = requireContext().getSharedPreferences("MyAppPrefs", 0)
+        val userId = prefs.getString("userId", null)
 
-        val user = auth.currentUser
-        if (user == null) {
+        if (userId == null) {
             // Belum login
             tvWelcome.text = "Selamat siang,"
             tvUserName.text = "Guest"
         } else {
             // Sudah login, ambil data dari Firestore
-            firestore.collection("User").document(user.uid)
+            firestore.collection("User").document(userId)
                 .get()
                 .addOnSuccessListener { document ->
                     if (document != null && document.exists()) {
@@ -76,7 +76,6 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                     tvUserName.text = "User"
                 }
         }
-
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
@@ -103,25 +102,30 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                         .commit()
                 }
                 R.id.nav_settings -> Toast.makeText(requireContext(), "Settings clicked", Toast.LENGTH_SHORT).show()
-                R.id.nav_logout -> Toast.makeText(requireContext(), "Logout clicked", Toast.LENGTH_SHORT).show()
+                R.id.nav_logout -> {
+                    // 🔹 Clear SharedPreferences
+                    prefs.edit().remove("userId").apply()
+                    Toast.makeText(requireContext(), "Logout berhasil!", Toast.LENGTH_SHORT).show()
+
+                    parentFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainer, LoginFragment())
+                        .commit()
+                }
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
 
-
         // Listener Bottom Nav
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
-                    // balik ke DashboardFragment
                     parentFragmentManager.beginTransaction()
                         .replace(R.id.fragmentContainer, DashboardFragment())
                         .commit()
                     true
                 }
                 R.id.nav_search -> {
-                    // buka LocationFragment
                     parentFragmentManager.beginTransaction()
                         .replace(R.id.fragmentContainer, LocationFragment())
                         .addToBackStack(null)
@@ -131,8 +135,6 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                 else -> false
             }
         }
-
-
 
         // === Summary Fragment ===
         val summaryFragment =
@@ -184,7 +186,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                     geocoder.getFromLocation(location.latitude, location.longitude, 1)
 
                 val placeName = if (!addresses.isNullOrEmpty()) {
-                    addresses[0].getAddressLine(0) // alamat lengkap
+                    addresses[0].getAddressLine(0)
                 } else {
                     "Lokasi tidak diketahui"
                 }
@@ -257,7 +259,6 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
             val amount = etAmount.text.toString()
 
             if (date.isNotEmpty() && amount.isNotEmpty()) {
-                // ambil lokasi saat tambah
                 getCurrentLocation { lokasi ->
                     val transaksi = Transaction(
                         title = type,
@@ -265,7 +266,6 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                         date = "$date – 📍$lokasi"
                     )
 
-                    // tambahkan ke list + update adapter
                     transactionList.add(0, transaksi)
                     transactionAdapter.notifyItemInserted(0)
 
