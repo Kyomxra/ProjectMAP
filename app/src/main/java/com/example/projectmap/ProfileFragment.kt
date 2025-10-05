@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,10 +12,13 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -28,12 +32,14 @@ class ProfileFragment : Fragment() {
     private lateinit var tvDob: TextView
 
     private val PICK_IMAGE_REQUEST = 1001
+    private val CAMERA_REQUEST = 1002
     private var imageUri: Uri? = null
 
     private val firestore = FirebaseFirestore.getInstance()
     private val storageRef = FirebaseStorage.getInstance().getReference("profile_pictures")
 
     private var userId: String? = null
+    private var cameraPhotoUri: Uri? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -47,12 +53,6 @@ class ProfileFragment : Fragment() {
         tvEmail = view.findViewById(R.id.tvEmail)
         tvDob = view.findViewById(R.id.tvDob)
 
-        val toolbar = view.findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.topAppBar)
-        toolbar.setNavigationOnClickListener {
-            parentFragmentManager.popBackStack() // balik ke fragment sebelumnya
-        }
-
-        // 🔹 Ambil userId dari SharedPreferences
         val prefs = requireContext().getSharedPreferences("MyAppPrefs", 0)
         userId = prefs.getString("userId", null)
 
@@ -63,10 +63,24 @@ class ProfileFragment : Fragment() {
         }
 
         btnChangePhoto.setOnClickListener {
-            pickImageFromGallery()
+            showImagePickerDialog()
         }
 
         return view
+    }
+
+    private fun showImagePickerDialog() {
+        val options = arrayOf("Gallery", "Camera")
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Pilih Sumber Foto")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> pickImageFromGallery()
+                    1 -> captureImageFromCamera()
+                }
+            }
+            .show()
     }
 
     private fun loadUserProfile(userId: String) {
@@ -95,13 +109,7 @@ class ProfileFragment : Fragment() {
                     if (!imageUrl.isNullOrEmpty()) {
                         Glide.with(requireContext()).load(imageUrl).into(imgProfile)
                     }
-
-                } else {
-                    Toast.makeText(requireContext(), "Profil tidak ditemukan", Toast.LENGTH_SHORT).show()
                 }
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Gagal memuat profil", Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -111,34 +119,49 @@ class ProfileFragment : Fragment() {
         startActivityForResult(intent, PICK_IMAGE_REQUEST)
     }
 
+    private fun captureImageFromCamera() {
+        val photoFile = File.createTempFile("profile_${System.currentTimeMillis()}", ".jpg", requireContext().cacheDir)
+        cameraPhotoUri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", photoFile)
+
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
+        startActivityForResult(intent, CAMERA_REQUEST)
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK && data != null) {
-            imageUri = data.data
-            uploadImageToFirebase()
+        if (resultCode == Activity.RESULT_OK) {
+            when (requestCode) {
+                PICK_IMAGE_REQUEST -> {
+                    imageUri = data?.data
+                    uploadImageToFirebase()
+                }
+                CAMERA_REQUEST -> {
+                    imageUri = cameraPhotoUri
+                    uploadImageToFirebase()
+                }
+            }
         }
     }
 
     private fun uploadImageToFirebase() {
-        if (userId == null) return
+        if (userId == null || imageUri == null) return
 
         val fileRef = storageRef.child("${userId}.jpg")
 
-        imageUri?.let { uri ->
-            fileRef.putFile(uri)
-                .addOnSuccessListener {
-                    fileRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                        firestore.collection("User").document(userId!!)
-                            .update("imageURL", downloadUri.toString())
-                            .addOnSuccessListener {
-                                Glide.with(requireContext()).load(downloadUri).into(imgProfile)
-                                Toast.makeText(requireContext(), "Foto profil diperbarui!", Toast.LENGTH_SHORT).show()
-                            }
-                    }
+        fileRef.putFile(imageUri!!)
+            .addOnSuccessListener {
+                fileRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                    firestore.collection("User").document(userId!!)
+                        .update("imageURL", downloadUri.toString())
+                        .addOnSuccessListener {
+                            Glide.with(requireContext()).load(downloadUri).into(imgProfile)
+                            Toast.makeText(requireContext(), "Foto profil diperbarui!", Toast.LENGTH_SHORT).show()
+                        }
                 }
-                .addOnFailureListener {
-                    Toast.makeText(requireContext(), "Gagal upload foto", Toast.LENGTH_SHORT).show()
-                }
-        }
+            }
+            .addOnFailureListener {
+                Toast.makeText(requireContext(), "Gagal upload foto", Toast.LENGTH_SHORT).show()
+            }
     }
 }
