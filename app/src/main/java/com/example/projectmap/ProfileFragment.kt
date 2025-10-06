@@ -1,6 +1,7 @@
 package com.example.projectmap
 
 import android.app.Activity
+import android.app.DatePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -8,6 +9,7 @@ import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -21,6 +23,9 @@ import com.google.firebase.storage.FirebaseStorage
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import android.widget.Spinner
+import java.util.Calendar
+
 
 class ProfileFragment : Fragment() {
 
@@ -30,6 +35,9 @@ class ProfileFragment : Fragment() {
     private lateinit var tvDisplayName: TextView
     private lateinit var tvEmail: TextView
     private lateinit var tvDob: TextView
+
+    private lateinit var btnEditDob: Button
+
 
     private val PICK_IMAGE_REQUEST = 1001
     private val CAMERA_REQUEST = 1002
@@ -52,6 +60,8 @@ class ProfileFragment : Fragment() {
         tvDisplayName = view.findViewById(R.id.tvDisplayName)
         tvEmail = view.findViewById(R.id.tvEmail)
         tvDob = view.findViewById(R.id.tvDob)
+        btnEditDob = view.findViewById(R.id.btnEditDob)
+
 
         val toolbar = view.findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.topAppBar)
         toolbar.setNavigationOnClickListener {
@@ -71,6 +81,11 @@ class ProfileFragment : Fragment() {
             showImagePickerDialog()
         }
 
+        btnEditDob.setOnClickListener {
+            showDatePickerDialog()
+        }
+
+
         return view
     }
 
@@ -88,6 +103,62 @@ class ProfileFragment : Fragment() {
             .show()
     }
 
+    private fun showDatePickerDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_dob_picker, null)
+        val spinnerDay = dialogView.findViewById<Spinner>(R.id.spinnerDay)
+        val spinnerMonth = dialogView.findViewById<Spinner>(R.id.spinnerMonth)
+        val spinnerYear = dialogView.findViewById<Spinner>(R.id.spinnerYear)
+
+        // Daftar tanggal 1–31
+        val days = (1..31).map { it.toString() }
+
+        // Daftar bulan
+        val months = listOf(
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        )
+
+        // 🔹 Ini dia bagian years (tahun 1950 sampai tahun sekarang)
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val years = (1950..currentYear).map { it.toString() }.reversed()
+        // `reversed()` biar tahun terbaru muncul di atas dropdown
+
+        // Isi semua spinner
+        spinnerDay.adapter =
+            ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, days)
+        spinnerMonth.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, months)
+        spinnerYear.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, years)
+
+        // Bangun dialog
+        val dialog = AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setPositiveButton("Simpan") { _, _ ->
+                val selectedDay = spinnerDay.selectedItem.toString().padStart(2, '0')
+                val selectedMonth = spinnerMonth.selectedItem.toString()
+                val selectedYear = spinnerYear.selectedItem.toString()
+
+                val formattedDate = "$selectedDay $selectedMonth $selectedYear"
+
+                if (userId != null) {
+                    firestore.collection("User").document(userId!!)
+                        .update("DOB", formattedDate)
+                        .addOnSuccessListener {
+                            tvDob.text = "DOB: $formattedDate"
+                            btnEditDob.visibility = View.GONE
+                            Toast.makeText(requireContext(), "Tanggal lahir disimpan!", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(requireContext(), "Gagal menyimpan DOB", Toast.LENGTH_SHORT).show()
+                        }
+                }
+            }
+            .setNegativeButton("Batal", null)
+            .create()
+
+        dialog.show()
+    }
+
+
     private fun loadUserProfile(userId: String) {
         firestore.collection("User").document(userId)
             .get()
@@ -98,18 +169,26 @@ class ProfileFragment : Fragment() {
                     val email = document.getString("Email") ?: ""
                     val dob = document.get("DOB")
                     val imageUrl = document.getString("imageURL")
-                    val dbUserId = document.getString("user_id") ?: userId
 
-                    tvUserId.text = "User ID: $dbUserId"
                     tvDisplayName.text = "Nama: $fName $lName"
                     tvEmail.text = "Email: $email"
 
-                    if (dob is com.google.firebase.Timestamp) {
-                        val date = dob.toDate()
-                        val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-                        tvDob.text = "DOB: ${sdf.format(date)}"
-                    } else if (dob is String) {
-                        tvDob.text = "DOB: $dob"
+                    // Cek DOB
+                    if (dob == null || (dob is String && dob.isEmpty())) {
+                        tvDob.text = "DOB: -"
+                        btnEditDob.visibility = View.VISIBLE
+                    } else {
+                        val dobText = when (dob) {
+                            is com.google.firebase.Timestamp -> {
+                                val date = dob.toDate()
+                                val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                                sdf.format(date)
+                            }
+                            is String -> dob
+                            else -> dob.toString()
+                        }
+                        tvDob.text = "DOB: $dobText"
+                        btnEditDob.visibility = View.GONE // sembunyikan tombol kalau sudah ada DOB
                     }
 
                     if (!imageUrl.isNullOrEmpty()) {
@@ -121,6 +200,7 @@ class ProfileFragment : Fragment() {
                 Toast.makeText(requireContext(), "Gagal ambil data user", Toast.LENGTH_SHORT).show()
             }
     }
+
 
     private fun pickImageFromGallery() {
         val intent = Intent(Intent.ACTION_PICK)

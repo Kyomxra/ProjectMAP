@@ -113,6 +113,16 @@
                 android:layout_height="wrap_content"
                 android:paddingVertical="8dp" />
 
+            <Button
+                android:id="@+id/btnEditDob"
+                android:text="Isi Tanggal Lahir"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+
+
         </LinearLayout>
     </ScrollView>
 
