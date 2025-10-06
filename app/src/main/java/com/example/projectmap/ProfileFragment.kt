@@ -53,6 +53,11 @@ class ProfileFragment : Fragment() {
         tvEmail = view.findViewById(R.id.tvEmail)
         tvDob = view.findViewById(R.id.tvDob)
 
+        val toolbar = view.findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.topAppBar)
+        toolbar.setNavigationOnClickListener {
+            requireActivity().onBackPressedDispatcher.onBackPressed()
+        }
+
         val prefs = requireContext().getSharedPreferences("MyAppPrefs", 0)
         userId = prefs.getString("userId", null)
 
