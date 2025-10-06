@@ -103,14 +103,19 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                 }
                 R.id.nav_settings -> Toast.makeText(requireContext(), "Settings clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_logout -> {
-                    // 🔹 Clear SharedPreferences
+                    // Clear SharedPreferences
                     prefs.edit().remove("userId").apply()
                     Toast.makeText(requireContext(), "Logout berhasil!", Toast.LENGTH_SHORT).show()
 
+                    // Hapus semua fragment di back stack biar nggak bisa balik
+                    parentFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+
+                    // Ganti ke LoginFragment
                     parentFragmentManager.beginTransaction()
                         .replace(R.id.fragmentContainer, LoginFragment())
                         .commit()
                 }
+
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true

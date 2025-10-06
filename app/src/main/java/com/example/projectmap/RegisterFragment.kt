@@ -23,6 +23,14 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
         val etConfirmPassword = view.findViewById<EditText>(R.id.etConfirmPassword)
         val btnRegister = view.findViewById<Button>(R.id.btnRegister)
 
+        val btnCancel = view.findViewById<Button>(R.id.btnCancel)
+        btnCancel.setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragmentContainer, LoginFragment())
+                .commit()
+        }
+
+
         btnRegister.setOnClickListener {
             val userId = etUserId.text.toString().trim()
             val fName = etFName.text.toString().trim()
@@ -41,7 +49,7 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
                 return@setOnClickListener
             }
 
-            // 🔹 Cek apakah user_id sudah dipakai
+            // Cek apakah user_id sudah dipakai
             db.collection("User").document(userId).get()
                 .addOnSuccessListener { document ->
                     if (document.exists()) {
@@ -58,7 +66,7 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
                             "imageURL" to "" // default kosong
                         )
 
-                        // 🔹 simpan dengan userId sebagai documentId
+                        // simpan dengan userId sebagai documentId
                         db.collection("User").document(userId)
                             .set(user)
                             .addOnSuccessListener {
