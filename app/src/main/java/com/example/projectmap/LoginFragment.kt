@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.google.firebase.firestore.FirebaseFirestore
@@ -32,6 +33,8 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
         val emailInput = dialog.findViewById<EditText>(R.id.etEmail)
         val passwordInput = dialog.findViewById<EditText>(R.id.etPassword)
         val btnMasuk = dialog.findViewById<Button>(R.id.btnMasuk)
+        val tvRegister = dialog.findViewById<TextView>(R.id.tvRegister)
+
 
         btnMasuk.setOnClickListener {
             val email = emailInput.text.toString().trim()
@@ -42,6 +45,15 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
             } else {
                 Toast.makeText(requireContext(), "Isi semua data", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        // ke register fragment
+        tvRegister.setOnClickListener {
+            dialog.dismiss()
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragmentContainer, RegisterFragment())
+                .addToBackStack(null) // biar bisa balik ke login
+                .commit()
         }
 
         dialog.show()

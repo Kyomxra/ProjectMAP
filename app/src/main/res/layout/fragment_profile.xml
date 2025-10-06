@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#FFFFFF">
 
-    <!-- 🔹 Toolbar dengan tombol back -->
+    <!-- Toolbar dengan tombol back -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/topAppBar"
         android:layout_width="match_parent"
@@ -15,9 +15,9 @@
         android:title="Profil"
         android:titleTextColor="@android:color/white"
         app:navigationIcon="@drawable/left"
-        app:navigationIconTint="@color/black"/>
+        app:navigationIconTint="@color/white"/>
 
-    <!-- 🔹 Konten Scrollable -->
+    <!-- Konten Scrollable -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">

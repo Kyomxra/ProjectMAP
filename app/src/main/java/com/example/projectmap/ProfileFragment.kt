@@ -93,8 +93,9 @@ class ProfileFragment : Fragment() {
                     val email = document.getString("Email") ?: ""
                     val dob = document.get("DOB")
                     val imageUrl = document.getString("imageURL")
+                    val dbUserId = document.getString("user_id") ?: userId
 
-                    tvUserId.text = "User ID: $userId"
+                    tvUserId.text = "User ID: $dbUserId"
                     tvDisplayName.text = "Nama: $fName $lName"
                     tvEmail.text = "Email: $email"
 
@@ -110,6 +111,9 @@ class ProfileFragment : Fragment() {
                         Glide.with(requireContext()).load(imageUrl).into(imgProfile)
                     }
                 }
+            }
+            .addOnFailureListener {
+                Toast.makeText(requireContext(), "Gagal ambil data user", Toast.LENGTH_SHORT).show()
             }
     }
 
