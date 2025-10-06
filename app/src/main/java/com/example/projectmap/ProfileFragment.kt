@@ -164,6 +164,8 @@ class ProfileFragment : Fragment() {
             .get()
             .addOnSuccessListener { document ->
                 if (document != null && document.exists()) {
+                    tvUserId.text = "User ID: $userId"
+
                     val fName = document.getString("FName") ?: ""
                     val lName = document.getString("LName") ?: ""
                     val email = document.getString("Email") ?: ""
