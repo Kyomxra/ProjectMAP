@@ -1,11 +1,14 @@
 package com.example.projectmap
 
 import android.app.Activity
-import android.app.DatePickerDialog
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -15,16 +18,18 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
-import com.bumptech.glide.Glide
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import android.widget.Spinner
 import java.util.Calendar
+import android.Manifest
 
 
 class ProfileFragment : Fragment() {
@@ -35,16 +40,14 @@ class ProfileFragment : Fragment() {
     private lateinit var tvDisplayName: TextView
     private lateinit var tvEmail: TextView
     private lateinit var tvDob: TextView
-
     private lateinit var btnEditDob: Button
-
 
     private val PICK_IMAGE_REQUEST = 1001
     private val CAMERA_REQUEST = 1002
+    private val CAMERA_PERMISSION_REQUEST = 100
     private var imageUri: Uri? = null
 
     private val firestore = FirebaseFirestore.getInstance()
-    private val storageRef = FirebaseStorage.getInstance().getReference("profile_pictures")
 
     private var userId: String? = null
     private var cameraPhotoUri: Uri? = null
@@ -61,7 +64,6 @@ class ProfileFragment : Fragment() {
         tvEmail = view.findViewById(R.id.tvEmail)
         tvDob = view.findViewById(R.id.tvDob)
         btnEditDob = view.findViewById(R.id.btnEditDob)
-
 
         val toolbar = view.findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.topAppBar)
         toolbar.setNavigationOnClickListener {
@@ -84,7 +86,6 @@ class ProfileFragment : Fragment() {
         btnEditDob.setOnClickListener {
             showDatePickerDialog()
         }
-
 
         return view
     }
@@ -109,27 +110,19 @@ class ProfileFragment : Fragment() {
         val spinnerMonth = dialogView.findViewById<Spinner>(R.id.spinnerMonth)
         val spinnerYear = dialogView.findViewById<Spinner>(R.id.spinnerYear)
 
-        // Daftar tanggal 1–31
         val days = (1..31).map { it.toString() }
-
-        // Daftar bulan
         val months = listOf(
             "Januari", "Februari", "Maret", "April", "Mei", "Juni",
             "Juli", "Agustus", "September", "Oktober", "November", "Desember"
         )
-
-        // 🔹 Ini dia bagian years (tahun 1950 sampai tahun sekarang)
         val currentYear = Calendar.getInstance().get(Calendar.YEAR)
         val years = (1950..currentYear).map { it.toString() }.reversed()
-        // `reversed()` biar tahun terbaru muncul di atas dropdown
 
-        // Isi semua spinner
         spinnerDay.adapter =
             ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, days)
         spinnerMonth.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, months)
         spinnerYear.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, years)
 
-        // Bangun dialog
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogView)
             .setPositiveButton("Simpan") { _, _ ->
@@ -158,7 +151,6 @@ class ProfileFragment : Fragment() {
         dialog.show()
     }
 
-
     private fun loadUserProfile(userId: String) {
         firestore.collection("User").document(userId)
             .get()
@@ -170,12 +162,11 @@ class ProfileFragment : Fragment() {
                     val lName = document.getString("LName") ?: ""
                     val email = document.getString("Email") ?: ""
                     val dob = document.get("DOB")
-                    val imageUrl = document.getString("imageURL")
+                    val imageBase64 = document.getString("imageURL")
 
                     tvDisplayName.text = "Nama: $fName $lName"
                     tvEmail.text = "Email: $email"
 
-                    // Cek DOB
                     if (dob == null || (dob is String && dob.isEmpty())) {
                         tvDob.text = "DOB: -"
                         btnEditDob.visibility = View.VISIBLE
@@ -190,11 +181,18 @@ class ProfileFragment : Fragment() {
                             else -> dob.toString()
                         }
                         tvDob.text = "DOB: $dobText"
-                        btnEditDob.visibility = View.GONE // sembunyikan tombol kalau sudah ada DOB
+                        btnEditDob.visibility = View.GONE
                     }
 
-                    if (!imageUrl.isNullOrEmpty()) {
-                        Glide.with(requireContext()).load(imageUrl).into(imgProfile)
+                    // Load Base64 image
+                    if (!imageBase64.isNullOrEmpty()) {
+                        try {
+                            val decodedBytes = Base64.decode(imageBase64, Base64.DEFAULT)
+                            val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                            imgProfile.setImageBitmap(bitmap)
+                        } catch (e: Exception) {
+                            Toast.makeText(requireContext(), "Gagal decode gambar", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -203,7 +201,6 @@ class ProfileFragment : Fragment() {
             }
     }
 
-
     private fun pickImageFromGallery() {
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
@@ -211,12 +208,41 @@ class ProfileFragment : Fragment() {
     }
 
     private fun captureImageFromCamera() {
-        val photoFile = File.createTempFile("profile_${System.currentTimeMillis()}", ".jpg", requireContext().cacheDir)
-        cameraPhotoUri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", photoFile)
+        // Check if camera permission is granted
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+            != PackageManager.PERMISSION_GRANTED) {
+            // Request permission
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_REQUEST)
+            return
+        }
 
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
-        startActivityForResult(intent, CAMERA_REQUEST)
+        // Permission already granted, proceed with camera
+        launchCamera()
+    }
+
+    private fun launchCamera() {
+        try {
+            val photoFile = File.createTempFile("profile_${System.currentTimeMillis()}", ".jpg", requireContext().cacheDir)
+            cameraPhotoUri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", photoFile)
+
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
+            startActivityForResult(intent, CAMERA_REQUEST)
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "Gagal membuka kamera: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, launch camera
+                launchCamera()
+            } else {
+                Toast.makeText(requireContext(), "Izin kamera diperlukan untuk mengambil foto", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -225,34 +251,61 @@ class ProfileFragment : Fragment() {
             when (requestCode) {
                 PICK_IMAGE_REQUEST -> {
                     imageUri = data?.data
-                    uploadImageToFirebase()
+                    convertAndUploadImage()
                 }
                 CAMERA_REQUEST -> {
                     imageUri = cameraPhotoUri
-                    uploadImageToFirebase()
+                    convertAndUploadImage()
                 }
             }
         }
     }
 
-    private fun uploadImageToFirebase() {
+    private fun convertAndUploadImage() {
         if (userId == null || imageUri == null) return
 
-        val fileRef = storageRef.child("${userId}.jpg")
+        try {
+            val inputStream = requireContext().contentResolver.openInputStream(imageUri!!)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
 
-        fileRef.putFile(imageUri!!)
-            .addOnSuccessListener {
-                fileRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                    firestore.collection("User").document(userId!!)
-                        .update("imageURL", downloadUri.toString())
-                        .addOnSuccessListener {
-                            Glide.with(requireContext()).load(downloadUri).into(imgProfile)
-                            Toast.makeText(requireContext(), "Foto profil diperbarui!", Toast.LENGTH_SHORT).show()
-                        }
+            // Resize bitmap to reduce size (max 800x800)
+            val resizedBitmap = resizeBitmap(bitmap, 800, 800)
+
+            // Convert to Base64
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
+            val byteArray = byteArrayOutputStream.toByteArray()
+            val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
+
+            // Upload to Firestore
+            firestore.collection("User").document(userId!!)
+                .update("imageURL", base64String)
+                .addOnSuccessListener {
+                    imgProfile.setImageBitmap(resizedBitmap)
+                    Toast.makeText(requireContext(), "Foto profil diperbarui!", Toast.LENGTH_SHORT).show()
                 }
-            }
-            .addOnFailureListener {
-                Toast.makeText(requireContext(), "Gagal upload foto", Toast.LENGTH_SHORT).show()
-            }
+                .addOnFailureListener {
+                    Toast.makeText(requireContext(), "Gagal update foto", Toast.LENGTH_SHORT).show()
+                }
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "Gagal memproses gambar", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun resizeBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val aspectRatio = width.toFloat() / height.toFloat()
+        var newWidth = maxWidth
+        var newHeight = maxHeight
+
+        if (width > height) {
+            newHeight = (maxWidth / aspectRatio).toInt()
+        } else {
+            newWidth = (maxHeight * aspectRatio).toInt()
+        }
+
+        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
     }
 }
