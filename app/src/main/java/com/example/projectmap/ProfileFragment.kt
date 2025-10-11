@@ -30,12 +30,15 @@ import java.util.*
 import android.widget.Spinner
 import java.util.Calendar
 import android.Manifest
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 
 class ProfileFragment : Fragment() {
 
     private lateinit var imgProfile: ImageView
-    private lateinit var btnChangePhoto: Button
+    private lateinit var imgBanner: ImageView
+    private lateinit var btnChangePhoto: ImageView
+    private lateinit var btnChangeBanner: FloatingActionButton
     private lateinit var tvUserId: TextView
     private lateinit var tvDisplayName: TextView
     private lateinit var tvEmail: TextView
@@ -44,8 +47,11 @@ class ProfileFragment : Fragment() {
 
     private val PICK_IMAGE_REQUEST = 1001
     private val CAMERA_REQUEST = 1002
+    private val PICK_BANNER_REQUEST = 1003
+    private val CAMERA_BANNER_REQUEST = 1004
     private val CAMERA_PERMISSION_REQUEST = 100
     private var imageUri: Uri? = null
+    private var isBannerUpload = false
 
     private val firestore = FirebaseFirestore.getInstance()
 
@@ -58,7 +64,9 @@ class ProfileFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_profile, container, false)
         imgProfile = view.findViewById(R.id.imgProfile)
+        imgBanner = view.findViewById(R.id.imgBanner)
         btnChangePhoto = view.findViewById(R.id.btnChangePhoto)
+        btnChangeBanner = view.findViewById(R.id.btnChangeBanner)
         tvUserId = view.findViewById(R.id.tvUserId)
         tvDisplayName = view.findViewById(R.id.tvDisplayName)
         tvEmail = view.findViewById(R.id.tvEmail)
@@ -80,6 +88,12 @@ class ProfileFragment : Fragment() {
         }
 
         btnChangePhoto.setOnClickListener {
+            isBannerUpload = false
+            showImagePickerDialog()
+        }
+
+        btnChangeBanner.setOnClickListener {
+            isBannerUpload = true
             showImagePickerDialog()
         }
 
@@ -163,6 +177,7 @@ class ProfileFragment : Fragment() {
                     val email = document.getString("Email") ?: ""
                     val dob = document.get("DOB")
                     val imageBase64 = document.getString("imageURL")
+                    val bannerBase64 = document.getString("bannerURL")
 
                     tvDisplayName.text = "Nama: $fName $lName"
                     tvEmail.text = "Email: $email"
@@ -192,6 +207,17 @@ class ProfileFragment : Fragment() {
                             imgProfile.setImageBitmap(bitmap)
                         } catch (e: Exception) {
                             Toast.makeText(requireContext(), "Gagal decode gambar", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    // Load Base64 banner
+                    if (!bannerBase64.isNullOrEmpty()) {
+                        try {
+                            val decodedBytes = Base64.decode(bannerBase64, Base64.DEFAULT)
+                            val bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                            imgBanner.setImageBitmap(bitmap)
+                        } catch (e: Exception) {
+                            Toast.makeText(requireContext(), "Gagal decode banner", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -249,11 +275,11 @@ class ProfileFragment : Fragment() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == Activity.RESULT_OK) {
             when (requestCode) {
-                PICK_IMAGE_REQUEST -> {
+                PICK_IMAGE_REQUEST, PICK_BANNER_REQUEST -> {
                     imageUri = data?.data
                     convertAndUploadImage()
                 }
-                CAMERA_REQUEST -> {
+                CAMERA_REQUEST, CAMERA_BANNER_REQUEST -> {
                     imageUri = cameraPhotoUri
                     convertAndUploadImage()
                 }
@@ -268,8 +294,14 @@ class ProfileFragment : Fragment() {
             val inputStream = requireContext().contentResolver.openInputStream(imageUri!!)
             val bitmap = BitmapFactory.decodeStream(inputStream)
 
-            // Resize bitmap to reduce size (max 800x800)
-            val resizedBitmap = resizeBitmap(bitmap, 800, 800)
+            // Resize bitmap based on type
+            val resizedBitmap = if (isBannerUpload) {
+                // Banner: wider aspect ratio (e.g., 1200x400)
+                resizeBitmap(bitmap, 1200, 400)
+            } else {
+                // Profile: square (e.g., 800x800)
+                resizeBitmap(bitmap, 800, 800)
+            }
 
             // Convert to Base64
             val byteArrayOutputStream = ByteArrayOutputStream()
@@ -277,12 +309,19 @@ class ProfileFragment : Fragment() {
             val byteArray = byteArrayOutputStream.toByteArray()
             val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
 
-            // Upload to Firestore
+            // Upload to Firestore with correct field name
+            val fieldName = if (isBannerUpload) "bannerURL" else "imageURL"
+
             firestore.collection("User").document(userId!!)
-                .update("imageURL", base64String)
+                .update(fieldName, base64String)
                 .addOnSuccessListener {
-                    imgProfile.setImageBitmap(resizedBitmap)
-                    Toast.makeText(requireContext(), "Foto profil diperbarui!", Toast.LENGTH_SHORT).show()
+                    if (isBannerUpload) {
+                        imgBanner.setImageBitmap(resizedBitmap)
+                        Toast.makeText(requireContext(), "Banner diperbarui!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        imgProfile.setImageBitmap(resizedBitmap)
+                        Toast.makeText(requireContext(), "Foto profil diperbarui!", Toast.LENGTH_SHORT).show()
+                    }
                 }
                 .addOnFailureListener {
                     Toast.makeText(requireContext(), "Gagal update foto", Toast.LENGTH_SHORT).show()
@@ -296,16 +335,36 @@ class ProfileFragment : Fragment() {
         val width = bitmap.width
         val height = bitmap.height
 
-        val aspectRatio = width.toFloat() / height.toFloat()
-        var newWidth = maxWidth
-        var newHeight = maxHeight
+        // For banners, crop to fit aspect ratio
+        return if (maxWidth > maxHeight) {
+            // Banner mode: maintain aspect ratio and crop
+            val targetAspect = maxWidth.toFloat() / maxHeight.toFloat()
+            val currentAspect = width.toFloat() / height.toFloat()
 
-        if (width > height) {
-            newHeight = (maxWidth / aspectRatio).toInt()
+            val (cropWidth, cropHeight) = if (currentAspect > targetAspect) {
+                // Image is wider than target - crop width
+                val calculatedWidth = (height * targetAspect).toInt()
+                Pair(calculatedWidth, height)
+            } else {
+                // Image is taller than target - crop height
+                val calculatedHeight = (width / targetAspect).toInt()
+                Pair(width, calculatedHeight)
+            }
+
+            // Center crop
+            val xOffset = (width - cropWidth) / 2
+            val yOffset = (height - cropHeight) / 2
+
+            val croppedBitmap = Bitmap.createBitmap(bitmap, xOffset, yOffset, cropWidth, cropHeight)
+            Bitmap.createScaledBitmap(croppedBitmap, maxWidth, maxHeight, true)
         } else {
-            newWidth = (maxHeight * aspectRatio).toInt()
-        }
+            // Profile picture mode: square crop from center
+            val size = minOf(width, height)
+            val xOffset = (width - size) / 2
+            val yOffset = (height - size) / 2
 
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            val squareBitmap = Bitmap.createBitmap(bitmap, xOffset, yOffset, size, size)
+            Bitmap.createScaledBitmap(squareBitmap, maxWidth, maxHeight, true)
+        }
     }
 }
