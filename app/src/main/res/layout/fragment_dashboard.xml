@@ -79,12 +79,16 @@
                     android:weightSum="3"
                     android:layout_marginBottom="16dp">
 
-                    <!-- Card 1 -->
+                    <!-- Card 1 - Pendapatan Pokok -->
                     <androidx.cardview.widget.CardView
+                        android:id="@+id/btnPendapatanPokok"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_margin="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="3dp">
 
@@ -111,12 +115,16 @@
                         </LinearLayout>
                     </androidx.cardview.widget.CardView>
 
-                    <!-- Card 2 -->
+                    <!-- Card 2 - Target Tabungan -->
                     <androidx.cardview.widget.CardView
+                        android:id="@+id/btnTargetTabungan"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_margin="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="3dp">
 
@@ -143,12 +151,16 @@
                         </LinearLayout>
                     </androidx.cardview.widget.CardView>
 
-                    <!-- Card 3 -->
+                    <!-- Card 3 - Laporan Transaksi -->
                     <androidx.cardview.widget.CardView
+                        android:id="@+id/btnLaporanTransaksi"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_margin="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="3dp">
 

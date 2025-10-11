@@ -127,6 +127,26 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         fabAdd.setOnClickListener {
             showAddBottomSheet()
         }
+
+        // Target Tabungan button
+        val btnTargetTabungan = view.findViewById<androidx.cardview.widget.CardView>(R.id.btnTargetTabungan)
+        btnTargetTabungan?.setOnClickListener {
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragmentContainer, GoalsFragment())
+                .addToBackStack(null)
+                .commit()
+        }
+
+        // Optional: Add click handlers for other cards
+        val btnPendapatanPokok = view.findViewById<androidx.cardview.widget.CardView>(R.id.btnPendapatanPokok)
+        btnPendapatanPokok?.setOnClickListener {
+            Toast.makeText(requireContext(), "Pendapatan Pokok", Toast.LENGTH_SHORT).show()
+        }
+
+        val btnLaporanTransaksi = view.findViewById<androidx.cardview.widget.CardView>(R.id.btnLaporanTransaksi)
+        btnLaporanTransaksi?.setOnClickListener {
+            Toast.makeText(requireContext(), "Laporan Transaksi", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun loadUserData(uid: String, tvWelcome: TextView, tvUserName: TextView) {
@@ -153,32 +173,32 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         android.util.Log.d("DashboardDebug", "=== LOADING TRANSACTIONS ===")
         android.util.Log.d("DashboardDebug", "User ID: $uid")
 
+        // Removed orderBy to avoid needing composite index
         firestore.collection("Transactions")
             .whereEqualTo("user_id", uid)
-            .get()
-            .addOnSuccessListener { documents ->
-                android.util.Log.d("DashboardDebug", "Query SUCCESS! Found ${documents.size()} documents")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) {
+                    android.util.Log.e("DashboardDebug", "Listen failed: ${e.message}", e)
+                    return@addSnapshotListener
+                }
+
+                if (snapshots == null) {
+                    android.util.Log.d("DashboardDebug", "Snapshots null")
+                    return@addSnapshotListener
+                }
+
+                android.util.Log.d("DashboardDebug", "Found ${snapshots.size()} documents")
 
                 transactionList.clear()
 
-                if (documents.isEmpty) {
-                    android.util.Log.d("DashboardDebug", "No transactions found for user: $uid")
-                    Toast.makeText(requireContext(), "Belum ada transaksi", Toast.LENGTH_SHORT).show()
-                }
+                val tempList = mutableListOf<Transaction>()
 
-                for (doc in documents) {
-                    android.util.Log.d("DashboardDebug", "Document ID: ${doc.id}")
-
+                for (doc in snapshots) {
                     val type = doc.getString("type") ?: ""
                     val category = doc.getString("category") ?: "Transaksi"
                     val amount = doc.getLong("amount") ?: 0
                     val timestamp = doc.getTimestamp("date")
                     val note = doc.getString("note") ?: ""
-
-                    android.util.Log.d("DashboardDebug", "  type: $type")
-                    android.util.Log.d("DashboardDebug", "  category: $category")
-                    android.util.Log.d("DashboardDebug", "  amount: $amount")
-                    android.util.Log.d("DashboardDebug", "  note: $note")
 
                     val dateStr = if (timestamp != null) {
                         formatDate(timestamp)
@@ -189,18 +209,15 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                     val amountStr = formatCurrency(amount, type)
                     val title = if (note.isNotEmpty()) note else category
 
-                    val transaction = Transaction(title, amountStr, dateStr)
-                    transactionList.add(transaction)
-                    android.util.Log.d("DashboardDebug", "  Added: $title | $amountStr | $dateStr")
+                    tempList.add(Transaction(title, amountStr, dateStr, timestamp?.toDate()?.time ?: 0))
                 }
+
+                // Sort in memory by date (newest first)
+                tempList.sortByDescending { it.timestamp }
+                transactionList.addAll(tempList)
 
                 android.util.Log.d("DashboardDebug", "Total in list: ${transactionList.size}")
                 transactionAdapter.notifyDataSetChanged()
-            }
-            .addOnFailureListener { e ->
-                android.util.Log.e("DashboardDebug", "Query FAILED: ${e.message}")
-                android.util.Log.e("DashboardDebug", "Error details: ", e)
-                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
     }
 

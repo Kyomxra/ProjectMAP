@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardElevation="4dp"
+    app:cardCornerRadius="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvGoalName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Beli Laptop"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/black"/>
+
+        <TextView
+            android:id="@+id/tvProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rp 500.000 / Rp 10.000.000 (5%)"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp"/>
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:progress="5"/>
+
+        <TextView
+            android:id="@+id/tvDeadline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Deadline: 01 Jan 2026"
+            android:textSize="12sp"
+            android:layout_marginTop="8dp"
+            android:textColor="@android:color/darker_gray"/>
+
+        <TextView
+            android:id="@+id/tvMotivation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💰 Ayo mulai menabung untuk mencapai targetmu!"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp"
+            android:padding="8dp"
+            android:background="#E3F2FD"
+            android:textColor="#1976D2"
+            android:textStyle="italic"/>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
