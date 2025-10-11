@@ -5,24 +5,21 @@
     android:orientation="vertical"
     android:padding="20dp">
 
-    <!-- Judul -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tambahkan Pemasukan"
+        android:text="Tambahkan Tabungan"
         android:textSize="18sp"
         android:textStyle="bold"
         android:gravity="center"
         android:layout_marginBottom="16dp"/>
 
-    <!-- Spinner Tipe -->
     <Spinner
-        android:id="@+id/spinnerType"
+        android:id="@+id/spinnerGoal"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"/>
 
-    <!-- Input Tanggal -->
     <EditText
         android:id="@+id/etDate"
         android:layout_width="match_parent"
@@ -32,14 +29,13 @@
         android:clickable="true"
         android:layout_marginBottom="12dp"/>
 
-    <!-- Input Nominal -->
     <EditText
         android:id="@+id/etAmount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Nominal"
         android:inputType="number"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="12dp"/>
 
     <EditText
         android:id="@+id/etNote"
@@ -48,12 +44,9 @@
         android:hint="Catatan (opsional)"
         android:layout_marginBottom="16dp"/>
 
-    <!-- Tombol Tambahkan -->
     <Button
-        android:id="@+id/btnAddIncome"
+        android:id="@+id/btnAddSaving"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Tambahkan"/>
 </LinearLayout>
-
-

@@ -153,7 +153,6 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         android.util.Log.d("DashboardDebug", "=== LOADING TRANSACTIONS ===")
         android.util.Log.d("DashboardDebug", "User ID: $uid")
 
-        // Coba query sederhana dulu tanpa orderBy
         firestore.collection("Transactions")
             .whereEqualTo("user_id", uid)
             .get()
@@ -216,18 +215,13 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         calendar.set(currentYear, currentMonth + 1, 1, 0, 0, 0)
         val endOfMonth = Timestamp(calendar.time)
 
-        // 🔍 Debug: Log userId
         android.util.Log.d("DashboardDebug", "Loading summary for userId: $uid")
         android.util.Log.d("DashboardDebug", "Month range: $startOfMonth to $endOfMonth")
 
         firestore.collection("Transactions")
             .whereEqualTo("user_id", uid)
-            // 🔍 Temporarily commented out for testing
-            // .whereGreaterThanOrEqualTo("date", startOfMonth)
-            // .whereLessThan("date", endOfMonth)
             .get()
             .addOnSuccessListener { documents ->
-                // 🔍 Debug: Log hasil query
                 android.util.Log.d("DashboardDebug", "Found ${documents.size()} transactions")
                 var totalIncome = 0L
                 var totalExpense = 0L
@@ -236,17 +230,15 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                     val type = doc.getString("type") ?: ""
                     val amount = doc.getLong("amount") ?: 0
 
-                    // 🔍 Debug: Log setiap transaksi
                     android.util.Log.d("DashboardDebug", "Transaction: type=$type, amount=$amount")
 
                     when (type) {
                         "income" -> totalIncome += amount
                         "expense" -> totalExpense += amount
-                        "saving" -> totalExpense += amount  // Treat saving as expense
+                        "saving" -> totalExpense += amount
                     }
                 }
 
-                // 🔍 Debug: Log total
                 android.util.Log.d("DashboardDebug", "Total Income: $totalIncome, Total Expense: $totalExpense")
 
                 val monthName = SimpleDateFormat("MMMM yyyy", Locale("id", "ID")).format(Date())
@@ -353,7 +345,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         val spinnerType = dialogView.findViewById<Spinner>(R.id.spinnerType)
         val etDate = dialogView.findViewById<EditText>(R.id.etDate)
         val etAmount = dialogView.findViewById<EditText>(R.id.etAmount)
-        val etNote = dialogView.findViewById<EditText>(R.id.etNote) // Bisa null kalau belum ada di layout
+        val etNote = dialogView.findViewById<EditText>(R.id.etNote)
         val btnAdd = dialogView.findViewById<Button>(R.id.btnAddIncome)
 
         val types = listOf("Gaji", "Bonus", "Investasi", "Lainnya")
@@ -378,63 +370,288 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         }
 
         btnAdd.setOnClickListener {
-            val category = spinnerType.selectedItem.toString()
-            val amountStr = etAmount.text.toString()
-            val note = etNote?.text?.toString() ?: ""
+            try {
+                val category = spinnerType.selectedItem?.toString() ?: ""
+                val amountStr = etAmount.text.toString().trim()
+                val note = etNote.text.toString().trim()
 
-            android.util.Log.d("DashboardDebug", "=== ADD INCOME CLICKED ===")
-            android.util.Log.d("DashboardDebug", "Category: $category")
-            android.util.Log.d("DashboardDebug", "Amount: $amountStr")
-            android.util.Log.d("DashboardDebug", "Note: $note")
-            android.util.Log.d("DashboardDebug", "UserId: $userId")
+                android.util.Log.d("DashboardDebug", "=== ADD INCOME CLICKED ===")
+                android.util.Log.d("DashboardDebug", "Category: $category")
+                android.util.Log.d("DashboardDebug", "Amount: $amountStr")
+                android.util.Log.d("DashboardDebug", "Note: $note")
+                android.util.Log.d("DashboardDebug", "UserId: $userId")
 
-            if (amountStr.isEmpty()) {
-                Toast.makeText(requireContext(), "Masukkan jumlah!", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val amount = amountStr.toLongOrNull() ?: 0L
-            if (amount <= 0) {
-                Toast.makeText(requireContext(), "Jumlah harus lebih dari 0!", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            if (userId == null) {
-                Toast.makeText(requireContext(), "User belum login!", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val transaction = hashMapOf(
-                "user_id" to userId!!,
-                "type" to "income",
-                "category" to category,
-                "amount" to amount,
-                "date" to Timestamp(selectedCalendar.time),
-                "created_at" to Timestamp(Date()),
-                "note" to note
-            )
-
-            android.util.Log.d("DashboardDebug", "Saving transaction: $transaction")
-
-            firestore.collection("Transactions")
-                .add(transaction)
-                .addOnSuccessListener { documentReference ->
-                    android.util.Log.d("DashboardDebug", "Transaction saved! ID: ${documentReference.id}")
-                    Toast.makeText(requireContext(), "Pemasukan ditambahkan!", Toast.LENGTH_SHORT).show()
-                    dialog.dismiss()
-                    loadTransactions(userId!!)
-                    loadSummary(userId!!)
+                if (category.isEmpty()) {
+                    Toast.makeText(requireContext(), "Pilih kategori!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
                 }
-                .addOnFailureListener { e ->
-                    android.util.Log.e("DashboardDebug", "Failed to save: ${e.message}")
-                    Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+
+                if (amountStr.isEmpty()) {
+                    Toast.makeText(requireContext(), "Masukkan jumlah!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
                 }
+
+                val amount = amountStr.toLongOrNull()
+                if (amount == null || amount <= 0) {
+                    Toast.makeText(requireContext(), "Jumlah harus lebih dari 0!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                if (userId == null) {
+                    Toast.makeText(requireContext(), "User belum login!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val transaction = hashMapOf(
+                    "user_id" to userId!!,
+                    "type" to "income",
+                    "category" to category,
+                    "amount" to amount,
+                    "date" to Timestamp(selectedCalendar.time),
+                    "created_at" to Timestamp(Date()),
+                    "note" to note
+                )
+
+                android.util.Log.d("DashboardDebug", "Saving to Firestore: $transaction")
+
+                firestore.collection("Transactions")
+                    .add(transaction)
+                    .addOnSuccessListener { documentReference ->
+                        android.util.Log.d("DashboardDebug", "✅ Income saved! Doc ID: ${documentReference.id}")
+                        Toast.makeText(requireContext(), "Pemasukan ditambahkan!", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        loadTransactions(userId!!)
+                        loadSummary(userId!!)
+                    }
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("DashboardDebug", "❌ Failed to save income: ${e.message}", e)
+                        Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardDebug", "Error in income dialog: ${e.message}", e)
+                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
         dialog.show()
     }
 
     private fun showAddExpenseDialog() {
-        // Similar to showAddIncomeDialog but with type="expense"
-        Toast.makeText(requireContext(), "Dialog pengeluaran (implementasi serupa)", Toast.LENGTH_SHORT).show()
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_expense, null)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Tambahkan Pengeluaran")
+            .setView(dialogView)
+            .create()
+
+        val spinnerType = dialogView.findViewById<Spinner>(R.id.spinnerType)
+        val etDate = dialogView.findViewById<EditText>(R.id.etDate)
+        val etAmount = dialogView.findViewById<EditText>(R.id.etAmount)
+        val etNote = dialogView.findViewById<EditText>(R.id.etNote)
+        val btnAdd = dialogView.findViewById<Button>(R.id.btnAddExpense)
+
+        val types = listOf("Makan", "Transport", "Belanja", "Hiburan", "Lainnya")
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, types)
+        spinnerType.adapter = adapter
+
+        val selectedCalendar = Calendar.getInstance()
+        etDate.setText(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(selectedCalendar.time))
+
+        etDate.setOnClickListener {
+            val datePicker = DatePickerDialog(
+                requireContext(),
+                { _, year, month, day ->
+                    selectedCalendar.set(year, month, day)
+                    etDate.setText("$day/${month + 1}/$year")
+                },
+                selectedCalendar.get(Calendar.YEAR),
+                selectedCalendar.get(Calendar.MONTH),
+                selectedCalendar.get(Calendar.DAY_OF_MONTH)
+            )
+            datePicker.show()
+        }
+
+        btnAdd.setOnClickListener {
+            try {
+                val category = spinnerType.selectedItem?.toString() ?: ""
+                val amountStr = etAmount.text.toString().trim()
+                val note = etNote.text.toString().trim()
+
+                if (category.isEmpty()) {
+                    Toast.makeText(requireContext(), "Pilih kategori!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                if (amountStr.isEmpty()) {
+                    Toast.makeText(requireContext(), "Masukkan jumlah!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val amount = amountStr.toLongOrNull()
+                if (amount == null || amount <= 0) {
+                    Toast.makeText(requireContext(), "Jumlah harus lebih dari 0!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                if (userId == null) {
+                    Toast.makeText(requireContext(), "User belum login!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val transaction = hashMapOf(
+                    "user_id" to userId!!,
+                    "type" to "expense",
+                    "category" to category,
+                    "amount" to amount,
+                    "date" to Timestamp(selectedCalendar.time),
+                    "created_at" to Timestamp(Date()),
+                    "note" to note
+                )
+
+                firestore.collection("Transactions")
+                    .add(transaction)
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "Pengeluaran ditambahkan!", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        loadTransactions(userId!!)
+                        loadSummary(userId!!)
+                    }
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("DashboardDebug", "Failed to save expense: ${e.message}", e)
+                        Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardDebug", "Error in expense dialog: ${e.message}", e)
+                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showAddSavingDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_saving, null)
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle("Tambahkan Tabungan")
+            .setView(dialogView)
+            .create()
+
+        val spinnerType = dialogView.findViewById<Spinner>(R.id.spinnerGoal)
+        val etDate = dialogView.findViewById<EditText>(R.id.etDate)
+        val etAmount = dialogView.findViewById<EditText>(R.id.etAmount)
+        val etNote = dialogView.findViewById<EditText>(R.id.etNote)
+        val btnAdd = dialogView.findViewById<Button>(R.id.btnAddSaving)
+
+        val goalNames = mutableListOf<String>()
+        val goalIds = mutableListOf<String>()
+
+        if (userId != null) {
+            firestore.collection("Goals")
+                .whereEqualTo("user_id", userId)
+                .get()
+                .addOnSuccessListener { documents ->
+                    for (doc in documents) {
+                        val goalName = doc.getString("goal_name") ?: "Goal"
+                        goalNames.add(goalName)
+                        goalIds.add(doc.id)
+                    }
+
+                    if (goalNames.isEmpty()) {
+                        goalNames.add("Belum ada tujuan tabungan")
+                    }
+
+                    val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, goalNames)
+                    spinnerType.adapter = adapter
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardDebug", "Failed to load goals: ${e.message}", e)
+                    Toast.makeText(requireContext(), "Gagal memuat tujuan tabungan", Toast.LENGTH_SHORT).show()
+                }
+        }
+
+        val selectedCalendar = Calendar.getInstance()
+        etDate.setText(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(selectedCalendar.time))
+
+        etDate.setOnClickListener {
+            val datePicker = DatePickerDialog(
+                requireContext(),
+                { _, year, month, day ->
+                    selectedCalendar.set(year, month, day)
+                    etDate.setText("$day/${month + 1}/$year")
+                },
+                selectedCalendar.get(Calendar.YEAR),
+                selectedCalendar.get(Calendar.MONTH),
+                selectedCalendar.get(Calendar.DAY_OF_MONTH)
+            )
+            datePicker.show()
+        }
+
+        btnAdd.setOnClickListener {
+            try {
+                val selectedIndex = spinnerType.selectedItemPosition
+                val amountStr = etAmount.text.toString().trim()
+                val note = etNote.text.toString().trim()
+
+                if (goalIds.isEmpty()) {
+                    Toast.makeText(requireContext(), "Buat tujuan tabungan dulu!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                if (amountStr.isEmpty()) {
+                    Toast.makeText(requireContext(), "Masukkan jumlah!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val amount = amountStr.toLongOrNull()
+                if (amount == null || amount <= 0) {
+                    Toast.makeText(requireContext(), "Jumlah harus lebih dari 0!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                if (userId == null) {
+                    Toast.makeText(requireContext(), "User belum login!", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val selectedGoalId = goalIds[selectedIndex]
+
+                val transaction = hashMapOf(
+                    "user_id" to userId!!,
+                    "type" to "saving",
+                    "goal_id" to selectedGoalId,
+                    "amount" to amount,
+                    "date" to Timestamp(selectedCalendar.time),
+                    "created_at" to Timestamp(Date()),
+                    "note" to note
+                )
+
+                firestore.collection("Transactions")
+                    .add(transaction)
+                    .addOnSuccessListener {
+                        val goalRef = firestore.collection("Goals").document(selectedGoalId)
+                        firestore.runTransaction { transaction ->
+                            val goalSnapshot = transaction.get(goalRef)
+                            val currentAmount = goalSnapshot.getLong("current_amount") ?: 0L
+                            transaction.update(goalRef, "current_amount", currentAmount + amount)
+                        }.addOnSuccessListener {
+                            Toast.makeText(requireContext(), "Tabungan ditambahkan!", Toast.LENGTH_SHORT).show()
+                            dialog.dismiss()
+                            loadTransactions(userId!!)
+                            loadSummary(userId!!)
+                        }.addOnFailureListener { e ->
+                            android.util.Log.e("DashboardDebug", "Failed to update goal: ${e.message}", e)
+                            Toast.makeText(requireContext(), "Transaksi tersimpan tapi gagal update goal", Toast.LENGTH_SHORT).show()
+                            dialog.dismiss()
+                            loadTransactions(userId!!)
+                            loadSummary(userId!!)
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("DashboardDebug", "Failed to save saving: ${e.message}", e)
+                        Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("DashboardDebug", "Error in saving dialog: ${e.message}", e)
+                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+        dialog.show()
     }
 }
