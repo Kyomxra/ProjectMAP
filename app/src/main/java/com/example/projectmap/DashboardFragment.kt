@@ -26,6 +26,9 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import java.util.Locale
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.Timestamp
+import java.text.NumberFormat
+import java.text.SimpleDateFormat
 
 class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
@@ -35,10 +38,9 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val LOCATION_PERMISSION_REQUEST = 1001
 
-    // Firestore
     private val firestore = FirebaseFirestore.getInstance()
+    private var userId: String? = null
 
-    // untuk RecyclerView
     private lateinit var transactionAdapter: TransactionAdapter
     private val transactionList = mutableListOf<Transaction>()
 
@@ -48,38 +50,22 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         val tvWelcome = view.findViewById<TextView>(R.id.tvWelcome)
         val tvUserName = view.findViewById<TextView>(R.id.tvUserName)
 
-        // 🔹 Ambil userId dari SharedPreferences
         val prefs = requireContext().getSharedPreferences("MyAppPrefs", 0)
-        val userId = prefs.getString("userId", null)
+        userId = prefs.getString("userId", null)
 
         if (userId == null) {
-            // Belum login
             tvWelcome.text = "Selamat siang,"
             tvUserName.text = "Guest"
+            Toast.makeText(requireContext(), "Belum login! Silakan login dulu.", Toast.LENGTH_LONG).show()
         } else {
-            // Sudah login, ambil data dari Firestore
-            firestore.collection("User").document(userId)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document != null && document.exists()) {
-                        val fName = document.getString("FName") ?: ""
-                        val lName = document.getString("LName") ?: ""
-                        tvWelcome.text = "Selamat siang,"
-                        tvUserName.text = "$fName $lName"
-                    } else {
-                        tvWelcome.text = "Selamat siang,"
-                        tvUserName.text = "User"
-                    }
-                }
-                .addOnFailureListener {
-                    tvWelcome.text = "Selamat siang,"
-                    tvUserName.text = "User"
-                }
+            android.util.Log.d("DashboardDebug", "User logged in with ID: $userId")
+            loadUserData(userId!!, tvWelcome, tvUserName)
+            loadTransactions(userId!!)
+            loadSummary(userId!!)
         }
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
-        // === Drawer Setup ===
         drawerLayout = view.findViewById(R.id.drawerLayout)
         navView = view.findViewById(R.id.navView)
         bottomNav = view.findViewById(R.id.bottomNavigation)
@@ -87,12 +73,10 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         (requireActivity() as AppCompatActivity).setSupportActionBar(topAppBar)
 
-        // buka drawer kiri kalau tombol navigation diklik
         topAppBar.setNavigationOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
-        // Listener Drawer
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_profile -> {
@@ -103,25 +87,18 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                 }
                 R.id.nav_settings -> Toast.makeText(requireContext(), "Settings clicked", Toast.LENGTH_SHORT).show()
                 R.id.nav_logout -> {
-                    // Clear SharedPreferences
                     prefs.edit().remove("userId").apply()
                     Toast.makeText(requireContext(), "Logout berhasil!", Toast.LENGTH_SHORT).show()
-
-                    // Hapus semua fragment di back stack biar nggak bisa balik
                     parentFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-
-                    // Ganti ke LoginFragment
                     parentFragmentManager.beginTransaction()
                         .replace(R.id.fragmentContainer, LoginFragment())
                         .commit()
                 }
-
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
 
-        // Listener Bottom Nav
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
@@ -141,35 +118,180 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
             }
         }
 
-        // === Summary Fragment ===
-        val summaryFragment =
-            childFragmentManager.findFragmentById(R.id.summaryFragment) as SummaryFragment
-
-        val income = 1_200_000
-        val expense = 460_000
-        summaryFragment.updateSummary("Agustus 2025", income, expense)
-
-        // === RecyclerView Transaksi ===
         val rvTransactions = view.findViewById<RecyclerView>(R.id.rvTransactions)
         rvTransactions.layoutManager = LinearLayoutManager(requireContext())
-        transactionList.addAll(
-            listOf(
-                Transaction("Makan Siang Mi Ayam", "- Rp 20,000", "Today"),
-                Transaction("Transfer ke Fawwaz", "- Rp 75,000", "Yesterday"),
-                Transaction("Top Up Valorant", "- Rp 350,000", "Aug 11, 2025")
-            )
-        )
         transactionAdapter = TransactionAdapter(transactionList)
         rvTransactions.adapter = transactionAdapter
 
-        // === Floating Action Button ===
         val fabAdd = view.findViewById<FloatingActionButton>(R.id.fabAdd)
         fabAdd.setOnClickListener {
             showAddBottomSheet()
         }
     }
 
-    // 🔹 ambil lokasi
+    private fun loadUserData(uid: String, tvWelcome: TextView, tvUserName: TextView) {
+        firestore.collection("User").document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    val fName = document.getString("FName") ?: ""
+                    val lName = document.getString("LName") ?: ""
+                    tvWelcome.text = "Selamat siang,"
+                    tvUserName.text = "$fName $lName"
+                } else {
+                    tvWelcome.text = "Selamat siang,"
+                    tvUserName.text = "User"
+                }
+            }
+            .addOnFailureListener {
+                tvWelcome.text = "Selamat siang,"
+                tvUserName.text = "User"
+            }
+    }
+
+    private fun loadTransactions(uid: String) {
+        android.util.Log.d("DashboardDebug", "=== LOADING TRANSACTIONS ===")
+        android.util.Log.d("DashboardDebug", "User ID: $uid")
+
+        // Coba query sederhana dulu tanpa orderBy
+        firestore.collection("Transactions")
+            .whereEqualTo("user_id", uid)
+            .get()
+            .addOnSuccessListener { documents ->
+                android.util.Log.d("DashboardDebug", "Query SUCCESS! Found ${documents.size()} documents")
+
+                transactionList.clear()
+
+                if (documents.isEmpty) {
+                    android.util.Log.d("DashboardDebug", "No transactions found for user: $uid")
+                    Toast.makeText(requireContext(), "Belum ada transaksi", Toast.LENGTH_SHORT).show()
+                }
+
+                for (doc in documents) {
+                    android.util.Log.d("DashboardDebug", "Document ID: ${doc.id}")
+
+                    val type = doc.getString("type") ?: ""
+                    val category = doc.getString("category") ?: "Transaksi"
+                    val amount = doc.getLong("amount") ?: 0
+                    val timestamp = doc.getTimestamp("date")
+                    val note = doc.getString("note") ?: ""
+
+                    android.util.Log.d("DashboardDebug", "  type: $type")
+                    android.util.Log.d("DashboardDebug", "  category: $category")
+                    android.util.Log.d("DashboardDebug", "  amount: $amount")
+                    android.util.Log.d("DashboardDebug", "  note: $note")
+
+                    val dateStr = if (timestamp != null) {
+                        formatDate(timestamp)
+                    } else {
+                        "Unknown date"
+                    }
+
+                    val amountStr = formatCurrency(amount, type)
+                    val title = if (note.isNotEmpty()) note else category
+
+                    val transaction = Transaction(title, amountStr, dateStr)
+                    transactionList.add(transaction)
+                    android.util.Log.d("DashboardDebug", "  Added: $title | $amountStr | $dateStr")
+                }
+
+                android.util.Log.d("DashboardDebug", "Total in list: ${transactionList.size}")
+                transactionAdapter.notifyDataSetChanged()
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("DashboardDebug", "Query FAILED: ${e.message}")
+                android.util.Log.e("DashboardDebug", "Error details: ", e)
+                Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun loadSummary(uid: String) {
+        val calendar = Calendar.getInstance()
+        val currentMonth = calendar.get(Calendar.MONTH)
+        val currentYear = calendar.get(Calendar.YEAR)
+
+        calendar.set(currentYear, currentMonth, 1, 0, 0, 0)
+        val startOfMonth = Timestamp(calendar.time)
+
+        calendar.set(currentYear, currentMonth + 1, 1, 0, 0, 0)
+        val endOfMonth = Timestamp(calendar.time)
+
+        // 🔍 Debug: Log userId
+        android.util.Log.d("DashboardDebug", "Loading summary for userId: $uid")
+        android.util.Log.d("DashboardDebug", "Month range: $startOfMonth to $endOfMonth")
+
+        firestore.collection("Transactions")
+            .whereEqualTo("user_id", uid)
+            // 🔍 Temporarily commented out for testing
+            // .whereGreaterThanOrEqualTo("date", startOfMonth)
+            // .whereLessThan("date", endOfMonth)
+            .get()
+            .addOnSuccessListener { documents ->
+                // 🔍 Debug: Log hasil query
+                android.util.Log.d("DashboardDebug", "Found ${documents.size()} transactions")
+                var totalIncome = 0L
+                var totalExpense = 0L
+
+                for (doc in documents) {
+                    val type = doc.getString("type") ?: ""
+                    val amount = doc.getLong("amount") ?: 0
+
+                    // 🔍 Debug: Log setiap transaksi
+                    android.util.Log.d("DashboardDebug", "Transaction: type=$type, amount=$amount")
+
+                    when (type) {
+                        "income" -> totalIncome += amount
+                        "expense" -> totalExpense += amount
+                        "saving" -> totalExpense += amount  // Treat saving as expense
+                    }
+                }
+
+                // 🔍 Debug: Log total
+                android.util.Log.d("DashboardDebug", "Total Income: $totalIncome, Total Expense: $totalExpense")
+
+                val monthName = SimpleDateFormat("MMMM yyyy", Locale("id", "ID")).format(Date())
+                val summaryFragment = childFragmentManager.findFragmentById(R.id.summaryFragment) as? SummaryFragment
+                summaryFragment?.updateSummary(monthName, totalIncome.toInt(), totalExpense.toInt())
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("DashboardDebug", "Error loading summary: ${e.message}")
+                Toast.makeText(requireContext(), "Gagal memuat ringkasan", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun formatDate(timestamp: Timestamp): String {
+        val date = timestamp.toDate()
+        val calendar = Calendar.getInstance()
+        val today = calendar.time
+
+        calendar.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterday = calendar.time
+
+        return when {
+            isSameDay(date, today) -> "Today"
+            isSameDay(date, yesterday) -> "Yesterday"
+            else -> SimpleDateFormat("MMM dd, yyyy", Locale.ENGLISH).format(date)
+        }
+    }
+
+    private fun isSameDay(date1: Date, date2: Date): Boolean {
+        val cal1 = Calendar.getInstance().apply { time = date1 }
+        val cal2 = Calendar.getInstance().apply { time = date2 }
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+    }
+
+    private fun formatCurrency(amount: Long, type: String): String {
+        val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+        val formatted = formatter.format(amount).replace("Rp", "Rp ")
+        return when (type) {
+            "income" -> "+ $formatted"
+            "expense" -> "- $formatted"
+            "saving" -> "💰 $formatted"
+            else -> formatted
+        }
+    }
+
     private fun getCurrentLocation(onResult: (String) -> Unit) {
         if (ActivityCompat.checkSelfPermission(
                 requireContext(),
@@ -187,9 +309,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
                 val geocoder = Geocoder(requireContext(), Locale.getDefault())
-                val addresses =
-                    geocoder.getFromLocation(location.latitude, location.longitude, 1)
-
+                val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                 val placeName = if (!addresses.isNullOrEmpty()) {
                     addresses[0].getAddressLine(0)
                 } else {
@@ -202,7 +322,6 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         }
     }
 
-    // 🔹 bottom sheet: pilih pemasukan / pengeluaran
     private fun showAddBottomSheet() {
         val bottomSheetDialog = BottomSheetDialog(requireContext())
         val view = LayoutInflater.from(requireContext()).inflate(R.layout.bottom_sheet_add, null)
@@ -218,13 +337,12 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         btnPengeluaran.setOnClickListener {
             bottomSheetDialog.dismiss()
-            Toast.makeText(requireContext(), "Tambah Pengeluaran", Toast.LENGTH_SHORT).show()
+            showAddExpenseDialog()
         }
 
         bottomSheetDialog.show()
     }
 
-    // 🔹 dialog tambah pemasukan
     private fun showAddIncomeDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_income, null)
         val dialog = AlertDialog.Builder(requireContext())
@@ -235,52 +353,88 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         val spinnerType = dialogView.findViewById<Spinner>(R.id.spinnerType)
         val etDate = dialogView.findViewById<EditText>(R.id.etDate)
         val etAmount = dialogView.findViewById<EditText>(R.id.etAmount)
+        val etNote = dialogView.findViewById<EditText>(R.id.etNote) // Bisa null kalau belum ada di layout
         val btnAdd = dialogView.findViewById<Button>(R.id.btnAddIncome)
 
-        // Isi spinner tipe
-        val types = listOf("Gaji", "Bonus", "Lainnya")
+        val types = listOf("Gaji", "Bonus", "Investasi", "Lainnya")
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, types)
         spinnerType.adapter = adapter
 
-        // DatePicker
+        val selectedCalendar = Calendar.getInstance()
+        etDate.setText(SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(selectedCalendar.time))
+
         etDate.setOnClickListener {
-            val calendar = Calendar.getInstance()
             val datePicker = DatePickerDialog(
                 requireContext(),
                 { _, year, month, day ->
+                    selectedCalendar.set(year, month, day)
                     etDate.setText("$day/${month + 1}/$year")
                 },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
+                selectedCalendar.get(Calendar.YEAR),
+                selectedCalendar.get(Calendar.MONTH),
+                selectedCalendar.get(Calendar.DAY_OF_MONTH)
             )
             datePicker.show()
         }
 
-        // Button Tambahkan
         btnAdd.setOnClickListener {
-            val type = spinnerType.selectedItem.toString()
-            val date = etDate.text.toString()
-            val amount = etAmount.text.toString()
+            val category = spinnerType.selectedItem.toString()
+            val amountStr = etAmount.text.toString()
+            val note = etNote?.text?.toString() ?: ""
 
-            if (date.isNotEmpty() && amount.isNotEmpty()) {
-                getCurrentLocation { lokasi ->
-                    val transaksi = Transaction(
-                        title = type,
-                        amount = "+ Rp $amount",
-                        date = "$date – 📍$lokasi"
-                    )
+            android.util.Log.d("DashboardDebug", "=== ADD INCOME CLICKED ===")
+            android.util.Log.d("DashboardDebug", "Category: $category")
+            android.util.Log.d("DashboardDebug", "Amount: $amountStr")
+            android.util.Log.d("DashboardDebug", "Note: $note")
+            android.util.Log.d("DashboardDebug", "UserId: $userId")
 
-                    transactionList.add(0, transaksi)
-                    transactionAdapter.notifyItemInserted(0)
+            if (amountStr.isEmpty()) {
+                Toast.makeText(requireContext(), "Masukkan jumlah!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
+            val amount = amountStr.toLongOrNull() ?: 0L
+            if (amount <= 0) {
+                Toast.makeText(requireContext(), "Jumlah harus lebih dari 0!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (userId == null) {
+                Toast.makeText(requireContext(), "User belum login!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val transaction = hashMapOf(
+                "user_id" to userId!!,
+                "type" to "income",
+                "category" to category,
+                "amount" to amount,
+                "date" to Timestamp(selectedCalendar.time),
+                "created_at" to Timestamp(Date()),
+                "note" to note
+            )
+
+            android.util.Log.d("DashboardDebug", "Saving transaction: $transaction")
+
+            firestore.collection("Transactions")
+                .add(transaction)
+                .addOnSuccessListener { documentReference ->
+                    android.util.Log.d("DashboardDebug", "Transaction saved! ID: ${documentReference.id}")
                     Toast.makeText(requireContext(), "Pemasukan ditambahkan!", Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
+                    loadTransactions(userId!!)
+                    loadSummary(userId!!)
                 }
-            } else {
-                Toast.makeText(requireContext(), "Lengkapi semua field!", Toast.LENGTH_SHORT).show()
-            }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("DashboardDebug", "Failed to save: ${e.message}")
+                    Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+                }
         }
         dialog.show()
+    }
+
+    private fun showAddExpenseDialog() {
+        // Similar to showAddIncomeDialog but with type="expense"
+        Toast.makeText(requireContext(), "Dialog pengeluaran (implementasi serupa)", Toast.LENGTH_SHORT).show()
     }
 }

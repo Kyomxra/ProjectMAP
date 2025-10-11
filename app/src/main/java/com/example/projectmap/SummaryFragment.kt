@@ -7,6 +7,8 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import android.widget.ProgressBar
 import android.widget.TextView
+import java.text.NumberFormat
+import java.util.Locale
 
 class SummaryFragment : Fragment() {
     private lateinit var tvMonth: TextView
@@ -30,14 +32,38 @@ class SummaryFragment : Fragment() {
         return view
     }
 
-    fun updateSummary(month: String, income: Int, expense: Int){
+    fun updateSummary(month: String, income: Int, expense: Int) {
         val balance = income - expense
-        tvMonth.text = month
-        tvIncome.text = "Rp $income"
-        tvExpense.text = "Rp $expense"
-        tvBalance.text = if (balance >= 0) "+ Rp $balance" else "- Rp ${-balance}"
 
+        // Format currency dengan pemisah ribuan
+        val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+
+        tvMonth.text = month
+        tvIncome.text = formatter.format(income).replace("Rp", "Rp ")
+        tvExpense.text = formatter.format(expense).replace("Rp", "Rp ")
+
+        // Format balance dengan + atau -
+        val balanceFormatted = formatter.format(Math.abs(balance)).replace("Rp", "Rp ")
+        tvBalance.text = if (balance >= 0) {
+            "+ $balanceFormatted"
+        } else {
+            "- $balanceFormatted"
+        }
+
+        // Update warna balance sesuai positif/negatif
+        if (balance >= 0) {
+            tvBalance.setTextColor(resources.getColor(android.R.color.holo_green_light, null))
+        } else {
+            tvBalance.setTextColor(resources.getColor(android.R.color.holo_red_light, null))
+        }
+
+        // Update progress bar: shows income percentage (green = income, red = expense)
+        // If you have more income, bar will be more green
         val total = income + expense
-        progressBar.progress = if (total > 0) (income * 100) / total else 0
+        progressBar.progress = if (total > 0) {
+            ((income.toFloat() / total.toFloat()) * 100).toInt().coerceIn(0, 100)
+        } else {
+            0
+        }
     }
 }

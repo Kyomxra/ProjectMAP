@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="utf-8" ?>
 <androidx.cardview.widget.CardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="16dp"
@@ -10,28 +10,32 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:background="@drawable/bg_gradient_summary"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
+        <!-- Month Title -->
         <TextView
             android:id="@+id/tvMonth"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Agustus 2025"
+            android:text="Loading..."
             android:textColor="@android:color/white"
             android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            tools:text="Oktober 2025" />
 
+        <!-- Income & Expense Row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="20dp"
             android:orientation="horizontal"
             android:weightSum="2">
 
+            <!-- Income Column -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -43,18 +47,23 @@
                     android:id="@+id/tvIncome"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Rp 1200000"
+                    android:text="Rp 0"
                     android:textColor="@android:color/white"
-                    android:textStyle="bold" />
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    tools:text="Rp 1.200.000" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
                     android:text="Pemasukan"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:alpha="0.8" />
             </LinearLayout>
 
+            <!-- Expense Column -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -66,36 +75,64 @@
                     android:id="@+id/tvExpense"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Rp 460000"
+                    android:text="Rp 0"
                     android:textColor="@android:color/white"
-                    android:textStyle="bold" />
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    tools:text="Rp 460.000" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
                     android:text="Pengeluaran"
                     android:textColor="@android:color/white"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:alpha="0.8" />
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Balance -->
         <TextView
             android:id="@+id/tvBalance"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="+ Rp 740000"
+            android:layout_marginTop="16dp"
+            android:text="Rp 0"
             android:textColor="@android:color/holo_green_light"
-            android:textStyle="bold" />
+            android:textSize="20sp"
+            android:textStyle="bold"
+            tools:text="+ Rp 740.000" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Saldo"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:alpha="0.8" />
+
+        <!-- Progress Bar -->
         <ProgressBar
             android:id="@+id/progressBar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="10dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="12dp"
+            android:layout_marginTop="16dp"
             android:max="100"
-            android:progress="60"
+            android:progress="0"
             android:progressDrawable="@drawable/progress_bar_custom" />
+
+        <!-- Progress Label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Hijau = Pemasukan | Merah = Pengeluaran"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:alpha="0.7" />
+
     </LinearLayout>
 </androidx.cardview.widget.CardView>
