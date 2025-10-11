@@ -338,6 +338,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         val btnPemasukan = view.findViewById<TextView>(R.id.btnPemasukan)
         val btnPengeluaran = view.findViewById<TextView>(R.id.btnPengeluaran)
+        val btnTabungan = view.findViewById<TextView>(R.id.btnTabungan)
 
         btnPemasukan.setOnClickListener {
             bottomSheetDialog.dismiss()
@@ -347,6 +348,11 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         btnPengeluaran.setOnClickListener {
             bottomSheetDialog.dismiss()
             showAddExpenseDialog()
+        }
+
+        btnTabungan?.setOnClickListener {
+            bottomSheetDialog.dismiss()
+            showAddSavingDialog()
         }
 
         bottomSheetDialog.show()
@@ -550,7 +556,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
             .setView(dialogView)
             .create()
 
-        val spinnerType = dialogView.findViewById<Spinner>(R.id.spinnerGoal)
+        val spinnerGoal = dialogView.findViewById<Spinner>(R.id.spinnerGoal)
         val etDate = dialogView.findViewById<EditText>(R.id.etDate)
         val etAmount = dialogView.findViewById<EditText>(R.id.etAmount)
         val etNote = dialogView.findViewById<EditText>(R.id.etNote)
@@ -560,25 +566,49 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         val goalIds = mutableListOf<String>()
 
         if (userId != null) {
+            // Show loading
+            goalNames.add("Memuat tujuan...")
+            val tempAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, goalNames)
+            spinnerGoal.adapter = tempAdapter
+            btnAdd.isEnabled = false
+
             firestore.collection("Goals")
                 .whereEqualTo("user_id", userId)
                 .get()
                 .addOnSuccessListener { documents ->
+                    goalNames.clear()
+                    goalIds.clear()
+
                     for (doc in documents) {
                         val goalName = doc.getString("goal_name") ?: "Goal"
-                        goalNames.add(goalName)
+                        val currentAmount = doc.getLong("current_amount") ?: 0
+                        val targetAmount = doc.getLong("target_amount") ?: 0
+                        val progress = if (targetAmount > 0) {
+                            ((currentAmount.toDouble() / targetAmount) * 100).toInt()
+                        } else 0
+
+                        goalNames.add("$goalName ($progress%)")
                         goalIds.add(doc.id)
                     }
 
                     if (goalNames.isEmpty()) {
-                        goalNames.add("Belum ada tujuan tabungan")
+                        goalNames.add("⚠️ Belum ada tujuan tabungan")
+                        btnAdd.isEnabled = false
+                        Toast.makeText(requireContext(), "Buat tujuan tabungan dulu di menu Target Tabungan!", Toast.LENGTH_LONG).show()
+                    } else {
+                        btnAdd.isEnabled = true
                     }
 
                     val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, goalNames)
-                    spinnerType.adapter = adapter
+                    spinnerGoal.adapter = adapter
                 }
                 .addOnFailureListener { e ->
                     android.util.Log.e("DashboardDebug", "Failed to load goals: ${e.message}", e)
+                    goalNames.clear()
+                    goalNames.add("❌ Gagal memuat tujuan")
+                    val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, goalNames)
+                    spinnerGoal.adapter = adapter
+                    btnAdd.isEnabled = false
                     Toast.makeText(requireContext(), "Gagal memuat tujuan tabungan", Toast.LENGTH_SHORT).show()
                 }
         }
@@ -602,14 +632,14 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         btnAdd.setOnClickListener {
             try {
-                val selectedIndex = spinnerType.selectedItemPosition
-                val amountStr = etAmount.text.toString().trim()
-                val note = etNote.text.toString().trim()
-
                 if (goalIds.isEmpty()) {
                     Toast.makeText(requireContext(), "Buat tujuan tabungan dulu!", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
+
+                val selectedIndex = spinnerGoal.selectedItemPosition
+                val amountStr = etAmount.text.toString().trim()
+                val note = etNote.text.toString().trim()
 
                 if (amountStr.isEmpty()) {
                     Toast.makeText(requireContext(), "Masukkan jumlah!", Toast.LENGTH_SHORT).show()
@@ -628,27 +658,32 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                 }
 
                 val selectedGoalId = goalIds[selectedIndex]
+                val selectedGoalName = goalNames[selectedIndex].substringBefore(" (")
 
                 val transaction = hashMapOf(
                     "user_id" to userId!!,
                     "type" to "saving",
                     "goal_id" to selectedGoalId,
+                    "category" to selectedGoalName,
                     "amount" to amount,
                     "date" to Timestamp(selectedCalendar.time),
                     "created_at" to Timestamp(Date()),
-                    "note" to note
+                    "note" to if (note.isNotEmpty()) note else "Tabungan untuk $selectedGoalName"
                 )
+
+                android.util.Log.d("DashboardDebug", "Saving transaction: $transaction")
 
                 firestore.collection("Transactions")
                     .add(transaction)
                     .addOnSuccessListener {
+                        // Update goal's current_amount
                         val goalRef = firestore.collection("Goals").document(selectedGoalId)
-                        firestore.runTransaction { transaction ->
-                            val goalSnapshot = transaction.get(goalRef)
+                        firestore.runTransaction { trans ->
+                            val goalSnapshot = trans.get(goalRef)
                             val currentAmount = goalSnapshot.getLong("current_amount") ?: 0L
-                            transaction.update(goalRef, "current_amount", currentAmount + amount)
+                            trans.update(goalRef, "current_amount", currentAmount + amount)
                         }.addOnSuccessListener {
-                            Toast.makeText(requireContext(), "Tabungan ditambahkan!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(requireContext(), "Tabungan ditambahkan ke $selectedGoalName!", Toast.LENGTH_SHORT).show()
                             dialog.dismiss()
                             loadTransactions(userId!!)
                             loadSummary(userId!!)

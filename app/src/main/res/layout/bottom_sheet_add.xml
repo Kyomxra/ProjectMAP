@@ -6,29 +6,20 @@
     android:padding="16dp">
 
     <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Tambah Transaksi"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:paddingBottom="16dp" />
-
-    <TextView
         android:id="@+id/btnPemasukan"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="💰 Pemasukan"
         android:textSize="16sp"
         android:padding="16dp"
-        android:background="?attr/selectableItemBackground"
         android:clickable="true"
-        android:focusable="true" />
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"/>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#E0E0E0" />
+        android:background="#E0E0E0"/>
 
     <TextView
         android:id="@+id/btnPengeluaran"
@@ -37,14 +28,14 @@
         android:text="💸 Pengeluaran"
         android:textSize="16sp"
         android:padding="16dp"
-        android:background="?attr/selectableItemBackground"
         android:clickable="true"
-        android:focusable="true" />
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"/>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#E0E0E0" />
+        android:background="#E0E0E0"/>
 
     <TextView
         android:id="@+id/btnTabungan"
@@ -53,8 +44,8 @@
         android:text="🏦 Tabungan"
         android:textSize="16sp"
         android:padding="16dp"
-        android:background="?attr/selectableItemBackground"
         android:clickable="true"
-        android:focusable="true" />
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"/>
 
 </LinearLayout>
