@@ -93,16 +93,46 @@ class GoalsFragment : Fragment(R.layout.fragment_goals) {
     }
 
     private fun showGoalOptionsDialog(goal: Goal) {
-        val options = arrayOf("Edit", "Hapus", "Tambah Tabungan", "Batal")
+        val progress = if (goal.targetAmount > 0) {
+            ((goal.currentAmount.toDouble() / goal.targetAmount) * 100).toInt()
+        } else 0
+
+        val options = if (progress >= 100 && goal.status != "completed") {
+            arrayOf("Edit", "Hapus", "Tambah Tabungan", "Tandai Selesai", "Batal")
+        } else if (goal.status == "completed") {
+            arrayOf("Edit", "Hapus", "Batal")
+        } else {
+            arrayOf("Edit", "Hapus", "Tambah Tabungan", "Batal")
+        }
+
         AlertDialog.Builder(requireContext())
             .setTitle(goal.goalName)
             .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showEditGoalDialog(goal)
-                    1 -> showDeleteConfirmation(goal)
-                    2 -> showAddSavingToGoal(goal)
+                when (options[which]) {
+                    "Edit" -> showEditGoalDialog(goal)
+                    "Hapus" -> showDeleteConfirmation(goal)
+                    "Tambah Tabungan" -> showAddSavingToGoal(goal)
+                    "Tandai Selesai" -> markGoalAsCompleted(goal)
                 }
             }
+            .show()
+    }
+
+    private fun markGoalAsCompleted(goal: Goal) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Selesaikan Target?")
+            .setMessage("Tandai \"${goal.goalName}\" sebagai selesai?")
+            .setPositiveButton("Ya") { _, _ ->
+                firestore.collection("Goals").document(goal.id)
+                    .update("status", "completed")
+                    .addOnSuccessListener {
+                        Toast.makeText(requireContext(), "Target ditandai selesai! 🎉", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .setNegativeButton("Batal", null)
             .show()
     }
 
@@ -179,21 +209,62 @@ class GoalsFragment : Fragment(R.layout.fragment_goals) {
     }
 
     private fun showDeleteConfirmation(goal: Goal) {
+        val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+        val savedAmount = formatter.format(goal.currentAmount).replace("Rp", "Rp ")
+
+        val message = if (goal.currentAmount > 0) {
+            "Yakin ingin menghapus \"${goal.goalName}\"?\n\n$savedAmount yang sudah ditabung akan dikembalikan ke saldo."
+        } else {
+            "Yakin ingin menghapus \"${goal.goalName}\"?"
+        }
+
         AlertDialog.Builder(requireContext())
             .setTitle("Hapus Target?")
-            .setMessage("Yakin ingin menghapus \"${goal.goalName}\"?")
+            .setMessage(message)
             .setPositiveButton("Hapus") { _, _ ->
-                firestore.collection("Goals").document(goal.id)
-                    .delete()
-                    .addOnSuccessListener {
-                        Toast.makeText(requireContext(), "Target dihapus!", Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+                deleteGoalAndRefund(goal)
             }
             .setNegativeButton("Batal", null)
             .show()
+    }
+
+    private fun deleteGoalAndRefund(goal: Goal) {
+        // Simply delete all saving transactions related to this goal
+        // This will automatically return the money to saldo (because the expense is removed)
+        firestore.collection("Transactions")
+            .whereEqualTo("goal_id", goal.id)
+            .whereEqualTo("type", "saving")
+            .get()
+            .addOnSuccessListener { documents ->
+                val batch = firestore.batch()
+
+                // Delete each saving transaction
+                for (doc in documents) {
+                    batch.delete(doc.reference)
+                }
+
+                // Delete the goal itself
+                batch.delete(firestore.collection("Goals").document(goal.id))
+
+                // Commit all deletions
+                batch.commit()
+                    .addOnSuccessListener {
+                        val message = if (goal.currentAmount > 0) {
+                            val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+                            val amount = formatter.format(goal.currentAmount).replace("Rp", "Rp ")
+                            "Target dihapus! $amount dikembalikan ke saldo."
+                        } else {
+                            "Target dihapus!"
+                        }
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(requireContext(), "Gagal menghapus: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun showAddSavingToGoal(goal: Goal) {
@@ -371,7 +442,10 @@ class GoalsAdapter(
         val daysRemaining = TimeUnit.MILLISECONDS.toDays(deadline.time - now.time)
 
         val deadlineStr = SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(deadline)
-        holder.tvDeadline.text = "Deadline: $deadlineStr"
+
+        // Show status badge
+        val statusText = if (progress >= 100) "✅ SELESAI" else "🔄 ${goal.status.uppercase()}"
+        holder.tvDeadline.text = "Deadline: $deadlineStr • $statusText"
 
         // Motivational messages
         val motivation = when {
@@ -386,6 +460,16 @@ class GoalsAdapter(
         }
 
         holder.tvMotivation.text = motivation
+
+        // Visual feedback for completed goals
+        if (progress >= 100) {
+            holder.progressBar.progressDrawable.setColorFilter(
+                android.graphics.Color.parseColor("#4CAF50"),
+                android.graphics.PorterDuff.Mode.SRC_IN
+            )
+        } else {
+            holder.progressBar.progressDrawable.clearColorFilter()
+        }
 
         // Click listener for CRUD
         holder.itemView.setOnClickListener {
