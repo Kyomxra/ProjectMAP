@@ -54,7 +54,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Analisis Pengeluaran"
+                        android:text="Analisis Pengeluaran vs Budget"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="4dp"/>
@@ -98,7 +98,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Rata-rata Mahasiswa Card -->
+            <!-- Budget Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -112,22 +112,44 @@
                     android:orientation="vertical"
                     android:padding="20dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="📊 Rata-rata Pengeluaran Mahasiswa"
-                        android:textSize="14sp"
-                        android:textColor="#666666"/>
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                    <TextView
-                        android:id="@+id/tvAverageExpense"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Rp 1.500.000"
-                        android:textSize="24sp"
-                        android:textStyle="bold"
-                        android:textColor="#333333"
-                        android:layout_marginTop="8dp"/>
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="💰 Budget Bulanan Kamu"
+                                android:textSize="14sp"
+                                android:textColor="#666666"/>
+
+                            <TextView
+                                android:id="@+id/tvBudgetAmount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Belum diatur"
+                                android:textSize="24sp"
+                                android:textStyle="bold"
+                                android:textColor="#333333"
+                                android:layout_marginTop="8dp"/>
+                        </LinearLayout>
+
+                        <Button
+                            android:id="@+id/btnSetBudget"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Atur Budget"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:textSize="12sp"/>
+                    </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -158,7 +180,7 @@
                         android:id="@+id/tvComparison"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Pengeluaranmu lebih hemat!"
+                        android:text="Kamu masih di jalur yang benar!"
                         android:textSize="18sp"
                         android:textStyle="bold"
                         android:textColor="#4CAF50"/>
@@ -167,7 +189,7 @@
                         android:id="@+id/tvComparisonDetail"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Kamu menghemat Rp 500.000 (33%) dibanding rata-rata mahasiswa"
+                        android:text="Atur budget terlebih dahulu untuk melihat perbandingan"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="8dp"
@@ -203,7 +225,7 @@
                         android:id="@+id/tvRecommendation"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Bagus! Teruskan kebiasaan berhemat ini. Pertimbangkan untuk menabung kelebihan budget-mu!"
+                        android:text="Atur budget bulananmu untuk mendapatkan insight dan rekomendasi keuangan yang personal!"
                         android:textSize="14sp"
                         android:textColor="#666666"
                         android:layout_marginTop="8dp"
@@ -216,7 +238,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="* Data rata-rata berdasarkan survei pengeluaran mahasiswa Indonesia"
+                android:text="* Pantau pengeluaranmu agar tetap sesuai dengan budget"
                 android:textSize="11sp"
                 android:textColor="#999999"
                 android:textStyle="italic"

@@ -1,7 +1,10 @@
 package com.example.projectmap
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -17,9 +20,7 @@ class ReportFragment : Fragment(R.layout.fragment_report) {
 
     private val firestore = FirebaseFirestore.getInstance()
     private var userId: String? = null
-
-    // Statistik rata-rata pengeluaran mahasiswa per bulan (dalam Rupiah)
-    private val averageStudentExpense = 1_500_000L // Rp 1.5 juta
+    private var userBudget: Long = 0L
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -37,29 +38,124 @@ class ReportFragment : Fragment(R.layout.fragment_report) {
 
         val tvMonthYear = view.findViewById<TextView>(R.id.tvMonthYear)
         val tvTotalExpense = view.findViewById<TextView>(R.id.tvTotalExpense)
-        val tvAverageExpense = view.findViewById<TextView>(R.id.tvAverageExpense)
+        val tvBudgetAmount = view.findViewById<TextView>(R.id.tvBudgetAmount)
         val tvComparison = view.findViewById<TextView>(R.id.tvComparison)
         val tvComparisonDetail = view.findViewById<TextView>(R.id.tvComparisonDetail)
         val tvRecommendation = view.findViewById<TextView>(R.id.tvRecommendation)
+        val btnSetBudget = view.findViewById<Button>(R.id.btnSetBudget)
 
         // Set bulan dan tahun saat ini
         val calendar = Calendar.getInstance()
         val monthName = SimpleDateFormat("MMMM yyyy", Locale("id", "ID")).format(calendar.time)
         tvMonthYear.text = "Laporan Bulan $monthName"
 
-        // Set rata-rata pengeluaran mahasiswa
-        val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-        tvAverageExpense.text = formatter.format(averageStudentExpense).replace("Rp", "Rp ")
-
         if (userId == null) {
             tvTotalExpense.text = "Rp 0"
+            tvBudgetAmount.text = "Rp 0"
             tvComparison.text = "Belum login"
             tvComparisonDetail.text = "Silakan login untuk melihat laporan"
             Toast.makeText(requireContext(), "Belum login!", Toast.LENGTH_SHORT).show()
             return
         }
 
+        // Load budget dari Firestore
+        loadUserBudget(userId!!, tvBudgetAmount)
+
+        // Load expense data
         loadExpenseData(userId!!, tvTotalExpense, tvComparison, tvComparisonDetail, tvRecommendation)
+
+        // Button untuk set/edit budget
+        btnSetBudget.setOnClickListener {
+            showSetBudgetDialog(tvBudgetAmount)
+        }
+    }
+
+    private fun loadUserBudget(uid: String, tvBudgetAmount: TextView) {
+        firestore.collection("User").document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    userBudget = document.getLong("monthly_budget") ?: 0L
+
+                    val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+                    if (userBudget > 0) {
+                        tvBudgetAmount.text = formatter.format(userBudget).replace("Rp", "Rp ")
+                    } else {
+                        tvBudgetAmount.text = "Belum diatur"
+                    }
+
+                    android.util.Log.d("ReportFragment", "Budget loaded: $userBudget")
+                } else {
+                    tvBudgetAmount.text = "Belum diatur"
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("ReportFragment", "Error loading budget: ${e.message}")
+                tvBudgetAmount.text = "Belum diatur"
+            }
+    }
+
+    private fun showSetBudgetDialog(tvBudgetAmount: TextView) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_set_budget, null)
+        val etBudget = dialogView.findViewById<EditText>(R.id.etBudget)
+
+        // Pre-fill dengan budget yang ada jika sudah diset
+        if (userBudget > 0) {
+            etBudget.setText(userBudget.toString())
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Atur Budget Bulanan")
+            .setMessage("Masukkan target budget pengeluaran bulananmu")
+            .setView(dialogView)
+            .setPositiveButton("Simpan") { dialog, _ ->
+                val budgetStr = etBudget.text.toString().trim()
+
+                if (budgetStr.isEmpty()) {
+                    Toast.makeText(requireContext(), "Masukkan jumlah budget!", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                val budget = budgetStr.toLongOrNull()
+                if (budget == null || budget <= 0) {
+                    Toast.makeText(requireContext(), "Budget harus lebih dari 0!", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                saveBudgetToFirestore(budget, tvBudgetAmount)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun saveBudgetToFirestore(budget: Long, tvBudgetAmount: TextView) {
+        if (userId == null) return
+
+        firestore.collection("User").document(userId!!)
+            .update("monthly_budget", budget)
+            .addOnSuccessListener {
+                userBudget = budget
+                val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+                tvBudgetAmount.text = formatter.format(budget).replace("Rp", "Rp ")
+                Toast.makeText(requireContext(), "Budget berhasil disimpan!", Toast.LENGTH_SHORT).show()
+
+                android.util.Log.d("ReportFragment", "Budget saved: $budget")
+
+                // Refresh comparison
+                val tvTotalExpense = view?.findViewById<TextView>(R.id.tvTotalExpense)
+                val tvComparison = view?.findViewById<TextView>(R.id.tvComparison)
+                val tvComparisonDetail = view?.findViewById<TextView>(R.id.tvComparisonDetail)
+                val tvRecommendation = view?.findViewById<TextView>(R.id.tvRecommendation)
+
+                if (tvTotalExpense != null && tvComparison != null && tvComparisonDetail != null && tvRecommendation != null) {
+                    loadExpenseData(userId!!, tvTotalExpense, tvComparison, tvComparisonDetail, tvRecommendation)
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("ReportFragment", "Error saving budget: ${e.message}")
+                Toast.makeText(requireContext(), "Gagal menyimpan budget: ${e.message}", Toast.LENGTH_LONG).show()
+            }
     }
 
     private fun loadExpenseData(
@@ -131,6 +227,14 @@ class ReportFragment : Fragment(R.layout.fragment_report) {
         tvComparisonDetail: TextView,
         tvRecommendation: TextView
     ) {
+        if (userBudget == 0L) {
+            tvComparison.text = "⚙️ Budget belum diatur"
+            tvComparison.setTextColor(resources.getColor(android.R.color.darker_gray, null))
+            tvComparisonDetail.text = "Atur budget bulananmu terlebih dahulu untuk melihat perbandingan"
+            tvRecommendation.text = "💡 Klik tombol 'Atur Budget' di atas untuk mulai mengelola keuanganmu!"
+            return
+        }
+
         when {
             userExpense == 0L -> {
                 tvComparison.text = "Belum ada pengeluaran"
@@ -138,37 +242,37 @@ class ReportFragment : Fragment(R.layout.fragment_report) {
                 tvComparisonDetail.text = "Kamu belum mencatat pengeluaran bulan ini"
                 tvRecommendation.text = "💡 Mulai catat pengeluaranmu untuk manajemen keuangan yang lebih baik!"
             }
-            userExpense < averageStudentExpense -> {
-                val difference = averageStudentExpense - userExpense
-                val percentage = ((averageStudentExpense - userExpense).toDouble() / averageStudentExpense * 100).toInt()
+            userExpense < userBudget -> {
+                val remaining = userBudget - userExpense
+                val usedPercentage = ((userExpense.toDouble() / userBudget) * 100).toInt()
 
-                tvComparison.text = "🎉 Pengeluaranmu lebih hemat!"
+                tvComparison.text = "🎉 Kamu masih di jalur yang benar!"
                 tvComparison.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
 
                 val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-                val formattedDiff = formatter.format(difference).replace("Rp", "Rp ")
+                val formattedRemaining = formatter.format(remaining).replace("Rp", "Rp ")
 
-                tvComparisonDetail.text = "Kamu menghemat $formattedDiff ($percentage%) dibanding rata-rata mahasiswa"
-                tvRecommendation.text = "💰 Bagus! Teruskan kebiasaan berhemat ini. Pertimbangkan untuk menabung kelebihan budget-mu!"
+                tvComparisonDetail.text = "Kamu sudah menggunakan $usedPercentage% dari budget. Sisa budget: $formattedRemaining"
+                tvRecommendation.text = "💰 Bagus! Pertahankan kebiasaan ini hingga akhir bulan. Sisihkan sisanya untuk tabungan!"
             }
-            userExpense == averageStudentExpense -> {
-                tvComparison.text = "👌 Pengeluaranmu pas rata-rata"
+            userExpense == userBudget -> {
+                tvComparison.text = "👌 Budget habis tepat!"
                 tvComparison.setTextColor(resources.getColor(android.R.color.holo_blue_dark, null))
-                tvComparisonDetail.text = "Pengeluaranmu sama dengan rata-rata mahasiswa pada umumnya"
-                tvRecommendation.text = "📊 Coba identifikasi pos pengeluaran yang bisa dikurangi untuk lebih hemat!"
+                tvComparisonDetail.text = "Pengeluaranmu sama persis dengan budget yang diatur"
+                tvRecommendation.text = "📊 Coba sisihkan sebagian untuk dana darurat atau tabungan!"
             }
             else -> {
-                val difference = userExpense - averageStudentExpense
-                val percentage = ((userExpense - averageStudentExpense).toDouble() / averageStudentExpense * 100).toInt()
+                val overbudget = userExpense - userBudget
+                val overPercentage = (((userExpense - userBudget).toDouble() / userBudget) * 100).toInt()
 
-                tvComparison.text = "⚠️ Pengeluaranmu lebih tinggi"
+                tvComparison.text = "⚠️ Pengeluaran melebihi budget"
                 tvComparison.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
 
                 val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
-                val formattedDiff = formatter.format(difference).replace("Rp", "Rp ")
+                val formattedOver = formatter.format(overbudget).replace("Rp", "Rp ")
 
-                tvComparisonDetail.text = "Pengeluaranmu melebihi $formattedDiff ($percentage%) dari rata-rata mahasiswa"
-                tvRecommendation.text = "💡 Coba evaluasi pengeluaranmu! Kurangi pengeluaran tidak penting dan buat budget yang lebih ketat."
+                tvComparisonDetail.text = "Kamu sudah over budget $formattedOver ($overPercentage% lebih tinggi dari target)"
+                tvRecommendation.text = "💡 Evaluasi pengeluaranmu! Kurangi pengeluaran tidak penting dan pertimbangkan untuk menyesuaikan budget bulan depan."
             }
         }
     }
