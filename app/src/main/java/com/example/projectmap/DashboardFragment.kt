@@ -173,6 +173,16 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
             }
     }
 
+    override fun onResume() {
+        super.onResume()
+        userId?.let {
+            android.util.Log.d("DashboardDebug", "onResume: refreshing data")
+            loadTransactions(it)
+            loadSummary(it)
+            checkAndAddRecurringIncome(it)  // ← AUTO CHECK
+        }
+    }
+
     private fun loadTransactions(uid: String) {
         android.util.Log.d("DashboardDebug", "=== LOADING TRANSACTIONS ===")
         android.util.Log.d("DashboardDebug", "User ID: $uid")
@@ -709,5 +719,115 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
             }
         }
         dialog.show()
+    }
+
+    private fun checkAndAddRecurringIncome(uid: String) {
+        val today = Calendar.getInstance()
+        val currentDay = today.get(Calendar.DAY_OF_MONTH)
+        val currentMonth = today.get(Calendar.MONTH)
+        val currentYear = today.get(Calendar.YEAR)
+
+        android.util.Log.d("RecurringIncome", "Checking recurring income for day: $currentDay")
+
+        // Get active recurring income
+        firestore.collection("RecurringIncome")
+            .whereEqualTo("user_id", uid)
+            .whereEqualTo("is_active", true)
+            .get()
+            .addOnSuccessListener { documents ->
+                if (documents.isEmpty) {
+                    android.util.Log.d("RecurringIncome", "No active recurring income found")
+                    return@addOnSuccessListener
+                }
+
+                for (doc in documents) {
+                    val dayOfMonth = doc.getLong("day_of_month")?.toInt() ?: continue
+                    val amount = doc.getLong("amount") ?: continue
+                    val jobTitle = doc.getString("job_title") ?: "Gaji"
+                    val recurringIncomeId = doc.id
+
+                    android.util.Log.d("RecurringIncome", "Found: $jobTitle, day=$dayOfMonth, amount=$amount")
+
+                    // Check if today is payday
+                    if (currentDay == dayOfMonth) {
+                        android.util.Log.d("RecurringIncome", "✅ Today is payday!")
+
+                        // Check if already added this month
+                        val monthStart = Calendar.getInstance().apply {
+                            set(currentYear, currentMonth, 1, 0, 0, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        val monthEnd = Calendar.getInstance().apply {
+                            set(currentYear, currentMonth + 1, 1, 0, 0, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+
+                        firestore.collection("Transactions")
+                            .whereEqualTo("user_id", uid)
+                            .whereEqualTo("recurring_income_id", recurringIncomeId)
+                            .whereGreaterThanOrEqualTo("date", Timestamp(monthStart.time))
+                            .whereLessThan("date", Timestamp(monthEnd.time))
+                            .get()
+                            .addOnSuccessListener { transactions ->
+                                if (transactions.isEmpty) {
+                                    android.util.Log.d("RecurringIncome", "Creating auto transaction...")
+                                    addRecurringIncomeTransaction(uid, recurringIncomeId, jobTitle, amount, today)
+                                } else {
+                                    android.util.Log.d("RecurringIncome", "Transaction already exists for this month")
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                android.util.Log.e("RecurringIncome", "Error checking transactions: ${e.message}")
+                            }
+                    } else {
+                        android.util.Log.d("RecurringIncome", "Not payday yet (current=$currentDay, payday=$dayOfMonth)")
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("RecurringIncome", "Error loading recurring income: ${e.message}")
+            }
+    }
+
+    private fun addRecurringIncomeTransaction(
+        uid: String,
+        recurringIncomeId: String,
+        jobTitle: String,
+        amount: Long,
+        date: Calendar
+    ) {
+        val transaction = hashMapOf(
+            "user_id" to uid,
+            "type" to "income",
+            "category" to jobTitle,
+            "amount" to amount,
+            "date" to Timestamp(date.time),
+            "created_at" to Timestamp(Date()),
+            "note" to "Gaji bulanan - $jobTitle",
+            "recurring_income_id" to recurringIncomeId
+        )
+
+        android.util.Log.d("RecurringIncome", "Adding transaction: $transaction")
+
+        firestore.collection("Transactions")
+            .add(transaction)
+            .addOnSuccessListener { docRef ->
+                android.util.Log.d("RecurringIncome", "✅ Auto transaction created: ${docRef.id}")
+                val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
+                val formatted = formatter.format(amount).replace("Rp", "Rp ")
+
+                Toast.makeText(
+                    requireContext(),
+                    "🎉 Gaji bulanan $formatted otomatis ditambahkan!",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Refresh data
+                loadTransactions(uid)
+                loadSummary(uid)
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("RecurringIncome", "❌ Failed to add auto transaction: ${e.message}")
+            }
     }
 }
