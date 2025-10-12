@@ -1,16 +1,23 @@
 package com.example.projectmap
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.location.Location
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -32,6 +39,12 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
     private val firestore = FirebaseFirestore.getInstance()
     private var userId: String? = null
 
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var currentLocation: Location? = null
+    private var userMarker: Marker? = null
+
+    private val LOCATION_PERMISSION_REQUEST = 1001
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -46,6 +59,9 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         val prefs = requireContext().getSharedPreferences("MyAppPrefs", 0)
         userId = prefs.getString("userId", null)
 
+        // Initialize location client
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
+
         // Initialize views
         tvTotalSpent = view.findViewById(R.id.tvTotalSpent)
         tvTransactionCount = view.findViewById(R.id.tvTransactionCount)
@@ -56,12 +72,73 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
             return
         }
 
+        // Check location permission
+        checkLocationPermission()
+
         // Load transaction data from Firestore
         loadTransactionData()
 
         // Initialize map
         val mapFragment = childFragmentManager.findFragmentById(R.id.mapFragment) as SupportMapFragment
         mapFragment?.getMapAsync(this)
+    }
+
+    private fun checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST
+            )
+        } else {
+            getCurrentLocation()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCATION_PERMISSION_REQUEST) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getCurrentLocation()
+            } else {
+                Toast.makeText(requireContext(), "Izin lokasi diperlukan untuk fitur ini", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun getCurrentLocation() {
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                currentLocation = location
+                android.util.Log.d("LocationFragment", "Current location: ${location.latitude}, ${location.longitude}")
+
+                // Update map if ready
+                if (::map.isInitialized) {
+                    showUserLocation()
+                }
+            } else {
+                android.util.Log.d("LocationFragment", "Location is null")
+                Toast.makeText(requireContext(), "Tidak dapat menemukan lokasi saat ini", Toast.LENGTH_SHORT).show()
+            }
+        }.addOnFailureListener { e ->
+            android.util.Log.e("LocationFragment", "Failed to get location: ${e.message}")
+        }
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
@@ -71,28 +148,86 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isMyLocationButtonEnabled = false
 
-        // Set map style (optional - remove if you don't have map_style.json)
-        /*
-        try {
-            map.setMapStyle(
-                MapStyleOptions.loadRawResourceStyle(
-                    requireContext(),
-                    R.raw.map_style
-                )
-            )
-        } catch (e: Exception) {
-            // Use default style if custom style fails
+        // Show user location if available
+        if (currentLocation != null) {
+            showUserLocation()
         }
-        */
 
         if (transactions.isNotEmpty()) {
             displayTransactions()
             updateStatistics()
         } else {
-            // Show default location (Jakarta) if no transactions
-            val jakarta = LatLng(-6.200000, 106.816666)
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(jakarta, 12f))
+            // Show user location or default to Jakarta
+            if (currentLocation != null) {
+                val userLatLng = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, 14f))
+            } else {
+                val jakarta = LatLng(-6.200000, 106.816666)
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(jakarta, 12f))
+            }
         }
+    }
+
+    private fun showUserLocation() {
+        if (currentLocation == null || !::map.isInitialized) return
+
+        val userPosition = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
+
+        // Remove old marker if exists
+        userMarker?.remove()
+
+        // Add custom user location marker (blue circle with person icon)
+        userMarker = map.addMarker(
+            MarkerOptions()
+                .position(userPosition)
+                .title("Lokasi Kamu")
+                .snippet("Kamu berada di sini")
+                .icon(createUserLocationMarker())
+                .zIndex(1000f) // Make sure it's on top
+        )
+
+        android.util.Log.d("LocationFragment", "User marker added at: ${userPosition.latitude}, ${userPosition.longitude}")
+    }
+
+    private fun createUserLocationMarker(): BitmapDescriptor {
+        val size = 70
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // Outer circle (light blue glow)
+        val glowPaint = Paint().apply {
+            color = Color.argb(80, 33, 150, 243)
+            isAntiAlias = true
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, glowPaint)
+
+        // Main circle (blue)
+        val mainPaint = Paint().apply {
+            color = Color.rgb(33, 150, 243) // Blue
+            isAntiAlias = true
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 3f, mainPaint)
+
+        // White border
+        val borderPaint = Paint().apply {
+            color = Color.WHITE
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 3f - 2, borderPaint)
+
+        // Inner dot
+        val dotPaint = Paint().apply {
+            color = Color.WHITE
+            isAntiAlias = true
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 8f, dotPaint)
+
+        return BitmapDescriptorFactory.fromBitmap(bitmap)
     }
 
     private fun loadTransactionData() {
@@ -126,36 +261,38 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
                         val amount = (doc.getLong("amount") ?: 0L).toDouble()
                         val timestamp = doc.getTimestamp("date")
 
-                        // For now, use random locations around Jakarta
-                        // TODO: Add actual location tracking in your app
-                        val latitude = -6.2 + (Math.random() * 0.1 - 0.05)
-                        val longitude = 106.8 + (Math.random() * 0.1 - 0.05)
+                        // Check if transaction has location data
+                        val latitude = doc.getDouble("latitude")
+                        val longitude = doc.getDouble("longitude")
 
-                        val dateStr = if (timestamp != null) {
-                            SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(timestamp.toDate())
-                        } else {
-                            "Unknown date"
-                        }
+                        // Only add transactions with valid location
+                        if (latitude != null && longitude != null) {
+                            val dateStr = if (timestamp != null) {
+                                SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(timestamp.toDate())
+                            } else {
+                                "Unknown date"
+                            }
 
-                        transactions.add(
-                            TransactionWithLocation(
-                                id = doc.id,
-                                name = name,
-                                latitude = latitude,
-                                longitude = longitude,
-                                amount = amount,
-                                category = category,
-                                date = dateStr,
-                                userId = userId!!,
-                                type = "expense"
+                            transactions.add(
+                                TransactionWithLocation(
+                                    id = doc.id,
+                                    name = name,
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    amount = amount,
+                                    category = category,
+                                    date = dateStr,
+                                    userId = userId!!,
+                                    type = "expense"
+                                )
                             )
-                        )
+                        }
                     } catch (ex: Exception) {
                         android.util.Log.e("LocationFragment", "Error parsing transaction: ${ex.message}")
                     }
                 }
 
-                android.util.Log.d("LocationFragment", "Loaded ${transactions.size} transactions")
+                android.util.Log.d("LocationFragment", "Loaded ${transactions.size} transactions with location")
 
                 // Update map if ready
                 if (::map.isInitialized) {
@@ -166,8 +303,13 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun displayTransactions() {
-        // Clear existing markers
+        // Clear existing markers except user marker
         map.clear()
+
+        // Re-add user marker
+        if (currentLocation != null) {
+            showUserLocation()
+        }
 
         if (transactions.isEmpty()) {
             Toast.makeText(requireContext(), "Belum ada transaksi dengan lokasi", Toast.LENGTH_SHORT).show()
@@ -175,6 +317,12 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         }
 
         val bounds = LatLngBounds.Builder()
+
+        // Include user location in bounds
+        if (currentLocation != null) {
+            bounds.include(LatLng(currentLocation!!.latitude, currentLocation!!.longitude))
+        }
+
         val locationFrequency = mutableMapOf<String, Int>()
 
         transactions.forEach { transaction ->
@@ -186,7 +334,7 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
                 MarkerOptions()
                     .position(position)
                     .title(transaction.name)
-                    .snippet("${formatCurrency(transaction.amount)} - ${transaction.category}")
+                    .snippet("${formatCurrency(transaction.amount)} - ${transaction.category}\n${transaction.date}")
                     .icon(createCustomMarker(markerColor, transaction.amount))
             )
 
@@ -199,8 +347,9 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
         // Add info window click listener
         map.setOnInfoWindowClickListener { marker ->
-            // You can open detail fragment here
-            showTransactionDetail(marker.title ?: "")
+            if (marker.title != "Lokasi Kamu") {
+                showTransactionDetail(marker.title ?: "")
+            }
         }
 
         // Move camera to show all markers
@@ -208,9 +357,14 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
             val padding = 150
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), padding))
         } catch (e: Exception) {
-            // Fallback to center of Jakarta
-            val jakarta = LatLng(-6.200000, 106.816666)
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(jakarta, 12f))
+            // Fallback
+            if (currentLocation != null) {
+                val userLatLng = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, 14f))
+            } else {
+                val jakarta = LatLng(-6.200000, 106.816666)
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(jakarta, 12f))
+            }
         }
 
         // Draw heatmap circles for frequent locations
@@ -306,6 +460,5 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
     private fun showTransactionDetail(name: String) {
         Toast.makeText(requireContext(), "Detail: $name", Toast.LENGTH_SHORT).show()
         // TODO: Implement navigation to detail screen
-        // Example: findNavController().navigate(R.id.action_to_detail)
     }
 }

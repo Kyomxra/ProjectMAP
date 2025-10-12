@@ -38,7 +38,7 @@
         <!-- 🔑 Tempat untuk API Key Google Maps -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="your_api_key" />
+            android:value="AIzaSyDC1_EOgdEWFfjUGcAGAS6rbjC2kafoZ_g" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

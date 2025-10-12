@@ -66,6 +66,32 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
+// Warm up GPS
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location == null) {
+                    android.util.Log.d("DashboardDebug", "GPS warming up, requesting location updates")
+                    // Request location to warm up GPS
+                    val locationRequest = com.google.android.gms.location.LocationRequest.create().apply {
+                        priority = com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+                        interval = 10000
+                        fastestInterval = 5000
+                    }
+                    try {
+                        fusedLocationClient.requestLocationUpdates(locationRequest, object : com.google.android.gms.location.LocationCallback() {}, null)
+                    } catch (e: Exception) {
+                        android.util.Log.e("DashboardDebug", "Error warming up GPS: ${e.message}")
+                    }
+                } else {
+                    android.util.Log.d("DashboardDebug", "GPS ready at: ${location.latitude}, ${location.longitude}")
+                }
+            }
+        }
+
         drawerLayout = view.findViewById(R.id.drawerLayout)
         navView = view.findViewById(R.id.navView)
         bottomNav = view.findViewById(R.id.bottomNavigation)
@@ -536,34 +562,152 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                     return@setOnClickListener
                 }
 
-                val transaction = hashMapOf(
-                    "user_id" to userId!!,
-                    "type" to "expense",
-                    "category" to category,
-                    "amount" to amount,
-                    "date" to Timestamp(selectedCalendar.time),
-                    "created_at" to Timestamp(Date()),
-                    "note" to note
-                )
+                // Get current location before saving
+                getCurrentLocationAndSaveExpense(category, amount, note, selectedCalendar, dialog)
 
-                firestore.collection("Transactions")
-                    .add(transaction)
-                    .addOnSuccessListener {
-                        Toast.makeText(requireContext(), "Pengeluaran ditambahkan!", Toast.LENGTH_SHORT).show()
-                        dialog.dismiss()
-                        loadTransactions(userId!!)
-                        loadSummary(userId!!)
-                    }
-                    .addOnFailureListener { e ->
-                        android.util.Log.e("DashboardDebug", "Failed to save expense: ${e.message}", e)
-                        Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
-                    }
             } catch (e: Exception) {
                 android.util.Log.e("DashboardDebug", "Error in expense dialog: ${e.message}", e)
                 Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
         dialog.show()
+    }
+
+    private fun getCurrentLocationAndSaveExpense(
+        category: String,
+        amount: Long,
+        note: String,
+        selectedCalendar: Calendar,
+        dialog: AlertDialog
+    ) {
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // No permission, save without location
+            android.util.Log.d("DashboardDebug", "No location permission, saving without location")
+            saveExpenseTransaction(category, amount, note, selectedCalendar, null, null, dialog)
+            return
+        }
+
+        // Show loading toast
+        Toast.makeText(requireContext(), "Mengambil lokasi...", Toast.LENGTH_SHORT).show()
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                android.util.Log.d("DashboardDebug", "Got location: ${location.latitude}, ${location.longitude}")
+                saveExpenseTransaction(
+                    category,
+                    amount,
+                    note,
+                    selectedCalendar,
+                    location.latitude,
+                    location.longitude,
+                    dialog
+                )
+            } else {
+                // Location null, try to request fresh location
+                android.util.Log.d("DashboardDebug", "LastLocation is null, requesting fresh location...")
+
+                requestFreshLocation { freshLocation ->
+                    if (freshLocation != null) {
+                        android.util.Log.d("DashboardDebug", "Got fresh location: ${freshLocation.latitude}, ${freshLocation.longitude}")
+                        saveExpenseTransaction(
+                            category,
+                            amount,
+                            note,
+                            selectedCalendar,
+                            freshLocation.latitude,
+                            freshLocation.longitude,
+                            dialog
+                        )
+                    } else {
+                        android.util.Log.d("DashboardDebug", "Fresh location also null, saving without location")
+                        Toast.makeText(requireContext(), "Tidak dapat lokasi, menyimpan tanpa lokasi", Toast.LENGTH_SHORT).show()
+                        saveExpenseTransaction(category, amount, note, selectedCalendar, null, null, dialog)
+                    }
+                }
+            }
+        }.addOnFailureListener { e ->
+            android.util.Log.e("DashboardDebug", "Failed to get location: ${e.message}")
+            Toast.makeText(requireContext(), "Gagal mendapatkan lokasi, menyimpan tanpa lokasi", Toast.LENGTH_SHORT).show()
+            saveExpenseTransaction(category, amount, note, selectedCalendar, null, null, dialog)
+        }
+    }
+
+    private fun requestFreshLocation(onResult: (android.location.Location?) -> Unit) {
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            onResult(null)
+            return
+        }
+
+        val locationRequest = com.google.android.gms.location.LocationRequest.create().apply {
+            priority = com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+            numUpdates = 1
+            maxWaitTime = 5000 // 5 seconds timeout
+        }
+
+        val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
+                val location = locationResult.lastLocation
+                fusedLocationClient.removeLocationUpdates(this)
+                onResult(location)
+            }
+        }
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
+        } catch (e: Exception) {
+            android.util.Log.e("DashboardDebug", "Error requesting location updates: ${e.message}")
+            onResult(null)
+        }
+    }
+
+    private fun saveExpenseTransaction(
+        category: String,
+        amount: Long,
+        note: String,
+        selectedCalendar: Calendar,
+        latitude: Double?,
+        longitude: Double?,
+        dialog: AlertDialog
+    ) {
+        val transaction = hashMapOf(
+            "user_id" to userId!!,
+            "type" to "expense",
+            "category" to category,
+            "amount" to amount,
+            "date" to Timestamp(selectedCalendar.time),
+            "created_at" to Timestamp(Date()),
+            "note" to note
+        )
+
+        // Add location if available
+        if (latitude != null && longitude != null) {
+            transaction["latitude"] = latitude
+            transaction["longitude"] = longitude
+            android.util.Log.d("DashboardDebug", "Saving with location: $latitude, $longitude")
+        } else {
+            android.util.Log.d("DashboardDebug", "Saving without location")
+        }
+
+        firestore.collection("Transactions")
+            .add(transaction)
+            .addOnSuccessListener {
+                Toast.makeText(requireContext(), "Pengeluaran ditambahkan!", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+                loadTransactions(userId!!)
+                loadSummary(userId!!)
+            }
+            .addOnFailureListener { e ->
+                android.util.Log.e("DashboardDebug", "Failed to save expense: ${e.message}", e)
+                Toast.makeText(requireContext(), "Gagal: ${e.message}", Toast.LENGTH_LONG).show()
+            }
     }
 
     private fun showAddSavingDialog() {
