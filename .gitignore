@@ -19,6 +19,9 @@
 *.keystore
 
 # Google Services (firebase, maps, dll.)
+google-services.json
+secrets.properties
+local.properties
 
 # Android Profiling
 *.hprof
