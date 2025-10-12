@@ -149,7 +149,10 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
 
         val btnLaporanTransaksi = view.findViewById<androidx.cardview.widget.CardView>(R.id.btnLaporanTransaksi)
         btnLaporanTransaksi?.setOnClickListener {
-            Toast.makeText(requireContext(), "Laporan Transaksi", Toast.LENGTH_SHORT).show()
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragmentContainer, ReportFragment())
+                .addToBackStack(null)
+                .commit()
         }
     }
 
