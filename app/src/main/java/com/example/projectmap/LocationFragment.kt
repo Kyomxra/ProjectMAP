@@ -23,6 +23,7 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -35,6 +36,7 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
     private lateinit var tvTotalSpent: TextView
     private lateinit var tvTransactionCount: TextView
     private lateinit var tvMostFrequentLocation: TextView
+    private lateinit var bottomNav: BottomNavigationView  // ADD THIS
 
     private val firestore = FirebaseFirestore.getInstance()
     private var userId: String? = null
@@ -67,6 +69,10 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         tvTransactionCount = view.findViewById(R.id.tvTransactionCount)
         tvMostFrequentLocation = view.findViewById(R.id.tvMostFrequentLocation)
 
+        // ADD BOTTOM NAV INITIALIZATION
+        bottomNav = view.findViewById(R.id.bottomNavigation)
+        setupBottomNavigation()
+
         if (userId == null) {
             Toast.makeText(requireContext(), "Belum login! Silakan login dulu.", Toast.LENGTH_LONG).show()
             return
@@ -81,6 +87,27 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         // Initialize map
         val mapFragment = childFragmentManager.findFragmentById(R.id.mapFragment) as SupportMapFragment
         mapFragment?.getMapAsync(this)
+    }
+
+    // ADD THIS METHOD
+    private fun setupBottomNavigation() {
+        bottomNav.selectedItemId = R.id.nav_search  // Highlight current item
+
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    parentFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainer, DashboardFragment())
+                        .commit()
+                    true
+                }
+                R.id.nav_search -> {
+                    // Already on this screen
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun checkLocationPermission() {
@@ -128,7 +155,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
                 currentLocation = location
                 android.util.Log.d("LocationFragment", "Current location: ${location.latitude}, ${location.longitude}")
 
-                // Update map if ready
                 if (::map.isInitialized) {
                     showUserLocation()
                 }
@@ -143,12 +169,9 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
     override fun onMapReady(googleMap: GoogleMap) {
         map = googleMap
-
-        // Enable zoom controls
         map.uiSettings.isZoomControlsEnabled = true
         map.uiSettings.isMyLocationButtonEnabled = false
 
-        // Show user location if available
         if (currentLocation != null) {
             showUserLocation()
         }
@@ -157,7 +180,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
             displayTransactions()
             updateStatistics()
         } else {
-            // Show user location or default to Jakarta
             if (currentLocation != null) {
                 val userLatLng = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, 14f))
@@ -172,18 +194,15 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         if (currentLocation == null || !::map.isInitialized) return
 
         val userPosition = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
-
-        // Remove old marker if exists
         userMarker?.remove()
 
-        // Add custom user location marker (blue circle with person icon)
         userMarker = map.addMarker(
             MarkerOptions()
                 .position(userPosition)
                 .title("Lokasi Kamu")
                 .snippet("Kamu berada di sini")
                 .icon(createUserLocationMarker())
-                .zIndex(1000f) // Make sure it's on top
+                .zIndex(1000f)
         )
 
         android.util.Log.d("LocationFragment", "User marker added at: ${userPosition.latitude}, ${userPosition.longitude}")
@@ -194,7 +213,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // Outer circle (light blue glow)
         val glowPaint = Paint().apply {
             color = Color.argb(80, 33, 150, 243)
             isAntiAlias = true
@@ -202,15 +220,13 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, glowPaint)
 
-        // Main circle (blue)
         val mainPaint = Paint().apply {
-            color = Color.rgb(33, 150, 243) // Blue
+            color = Color.rgb(33, 150, 243)
             isAntiAlias = true
             style = Paint.Style.FILL
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 3f, mainPaint)
 
-        // White border
         val borderPaint = Paint().apply {
             color = Color.WHITE
             isAntiAlias = true
@@ -219,7 +235,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 3f - 2, borderPaint)
 
-        // Inner dot
         val dotPaint = Paint().apply {
             color = Color.WHITE
             isAntiAlias = true
@@ -237,7 +252,7 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
         firestore.collection("Transactions")
             .whereEqualTo("user_id", userId)
-            .whereEqualTo("type", "expense") // Only show expenses
+            .whereEqualTo("type", "expense")
             .addSnapshotListener { snapshots, e ->
                 if (e != null) {
                     android.util.Log.e("LocationFragment", "Listen failed: ${e.message}", e)
@@ -261,11 +276,9 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
                         val amount = (doc.getLong("amount") ?: 0L).toDouble()
                         val timestamp = doc.getTimestamp("date")
 
-                        // Check if transaction has location data
                         val latitude = doc.getDouble("latitude")
                         val longitude = doc.getDouble("longitude")
 
-                        // Only add transactions with valid location
                         if (latitude != null && longitude != null) {
                             val dateStr = if (timestamp != null) {
                                 SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(timestamp.toDate())
@@ -294,7 +307,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
                 android.util.Log.d("LocationFragment", "Loaded ${transactions.size} transactions with location")
 
-                // Update map if ready
                 if (::map.isInitialized) {
                     displayTransactions()
                     updateStatistics()
@@ -303,10 +315,8 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun displayTransactions() {
-        // Clear existing markers except user marker
         map.clear()
 
-        // Re-add user marker
         if (currentLocation != null) {
             showUserLocation()
         }
@@ -318,7 +328,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
         val bounds = LatLngBounds.Builder()
 
-        // Include user location in bounds
         if (currentLocation != null) {
             bounds.include(LatLng(currentLocation!!.latitude, currentLocation!!.longitude))
         }
@@ -328,7 +337,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         transactions.forEach { transaction ->
             val position = LatLng(transaction.latitude, transaction.longitude)
 
-            // Add marker with custom color based on category
             val markerColor = getCategoryColor(transaction.category)
             val marker = map.addMarker(
                 MarkerOptions()
@@ -338,26 +346,22 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
                     .icon(createCustomMarker(markerColor, transaction.amount))
             )
 
-            // Track location frequency
             val locationKey = "${transaction.latitude},${transaction.longitude}"
             locationFrequency[locationKey] = locationFrequency.getOrDefault(locationKey, 0) + 1
 
             bounds.include(position)
         }
 
-        // Add info window click listener
         map.setOnInfoWindowClickListener { marker ->
             if (marker.title != "Lokasi Kamu") {
                 showTransactionDetail(marker.title ?: "")
             }
         }
 
-        // Move camera to show all markers
         try {
             val padding = 150
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), padding))
         } catch (e: Exception) {
-            // Fallback
             if (currentLocation != null) {
                 val userLatLng = LatLng(currentLocation!!.latitude, currentLocation!!.longitude)
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, 14f))
@@ -367,7 +371,6 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
             }
         }
 
-        // Draw heatmap circles for frequent locations
         drawHeatmapCircles(locationFrequency)
     }
 
@@ -375,11 +378,10 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
         val maxFrequency = locationFrequency.values.maxOrNull() ?: 1
 
         locationFrequency.forEach { (locationKey, frequency) ->
-            if (frequency > 1) { // Only show circles for locations visited more than once
+            if (frequency > 1) {
                 val coords = locationKey.split(",")
                 val position = LatLng(coords[0].toDouble(), coords[1].toDouble())
 
-                // Circle size and opacity based on frequency
                 val radius = 200.0 + (frequency * 100.0)
                 val fillColor = Color.argb(
                     (50 + (frequency.toFloat() / maxFrequency * 80)).toInt(),
@@ -400,9 +402,9 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
     private fun createCustomMarker(color: Int, amount: Double): BitmapDescriptor {
         val size = when {
-            amount >= 1000000 -> 60 // Large marker for expensive transactions
+            amount >= 1000000 -> 60
             amount >= 100000 -> 50
-            else -> 40 // Small marker for cheap transactions
+            else -> 40
         }
 
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -413,10 +415,8 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
             style = Paint.Style.FILL
         }
 
-        // Draw circle
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
 
-        // Draw white border
         paint.apply {
             this.color = Color.WHITE
             style = Paint.Style.STROKE
@@ -429,24 +429,21 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
     private fun getCategoryColor(category: String): Int {
         return when (category.lowercase()) {
-            "makan", "makanan", "food & drink" -> Color.rgb(255, 152, 0) // Orange
-            "transport", "transportasi" -> Color.rgb(33, 150, 243) // Blue
-            "belanja", "shopping" -> Color.rgb(156, 39, 176) // Purple
-            "hiburan", "entertainment" -> Color.rgb(233, 30, 99) // Pink
-            "bills", "tagihan" -> Color.rgb(76, 175, 80) // Green
-            else -> Color.rgb(158, 158, 158) // Gray
+            "makan", "makanan", "food & drink" -> Color.rgb(255, 152, 0)
+            "transport", "transportasi" -> Color.rgb(33, 150, 243)
+            "belanja", "shopping" -> Color.rgb(156, 39, 176)
+            "hiburan", "entertainment" -> Color.rgb(233, 30, 99)
+            "bills", "tagihan" -> Color.rgb(76, 175, 80)
+            else -> Color.rgb(158, 158, 158)
         }
     }
 
     private fun updateStatistics() {
-        // Calculate total spent
         val totalSpent = transactions.sumOf { it.amount }
         tvTotalSpent.text = formatCurrency(totalSpent)
 
-        // Count transactions
         tvTransactionCount.text = "${transactions.size} transaksi"
 
-        // Find most frequent location
         val locationCounts = transactions.groupingBy { it.name }.eachCount()
         val mostFrequent = locationCounts.maxByOrNull { it.value }
         tvMostFrequentLocation.text = mostFrequent?.key ?: "-"
@@ -459,6 +456,5 @@ class LocationFragment : Fragment(), OnMapReadyCallback {
 
     private fun showTransactionDetail(name: String) {
         Toast.makeText(requireContext(), "Detail: $name", Toast.LENGTH_SHORT).show()
-        // TODO: Implement navigation to detail screen
     }
 }
