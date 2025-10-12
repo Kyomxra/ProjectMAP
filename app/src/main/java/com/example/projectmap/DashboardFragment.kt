@@ -137,10 +137,14 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
                 .commit()
         }
 
-        // Optional: Add click handlers for other cards
+        // button pendapatan pokok
+
         val btnPendapatanPokok = view.findViewById<androidx.cardview.widget.CardView>(R.id.btnPendapatanPokok)
         btnPendapatanPokok?.setOnClickListener {
-            Toast.makeText(requireContext(), "Pendapatan Pokok", Toast.LENGTH_SHORT).show()
+            parentFragmentManager.beginTransaction()
+                .replace(R.id.fragmentContainer, RecurringIncomeFragment())
+                .addToBackStack(null)
+                .commit()
         }
 
         val btnLaporanTransaksi = view.findViewById<androidx.cardview.widget.CardView>(R.id.btnLaporanTransaksi)
