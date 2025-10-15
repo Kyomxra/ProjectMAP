@@ -11,7 +11,7 @@
         android:id="@+id/toolbarReport"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary"
+        android:background="@color/darkblue"
         android:elevation="4dp"
         app:title="Laporan Transaksi"
         app:titleTextColor="@android:color/white"
@@ -64,12 +64,13 @@
 
             <!-- Total Pengeluaran Card -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardTotalExpense"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="#FF5252">
+                app:cardBackgroundColor="@color/darkblue">
 
                 <LinearLayout
                     android:layout_width="match_parent"
